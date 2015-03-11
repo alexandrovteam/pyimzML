@@ -6,7 +6,7 @@ setup(
     description="Parser for conversion of imzML 1.1.0 files",
     long_description="""
 Parser for conversion of imzML 1.1.0 files.
-See specification here: http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf).
+See specification here: http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf.
 Outputs data as python lists and dicts.
 
 All Python versions from 2.7 on are supported, but Python 3.3 or newer is
@@ -22,7 +22,7 @@ recommended for performance reasons.""",
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
-        'Intended Audience :: Science/Research'
+        'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         'License :: OSI Approved :: Apache Software License',
         # 'Programming Language :: Python :: 2',
