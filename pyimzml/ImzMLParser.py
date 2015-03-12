@@ -18,8 +18,11 @@ from bisect import bisect_left, bisect_right
 # import ElementTree
 from xml.etree import ElementTree
 import mmap
+import numpy as np
 import struct
 from warnings import warn
+
+import centroid_detection
 
 """
 Parser for imzML 1.1.0 files (see specification here:
@@ -230,6 +233,9 @@ class ImzMLParser:
     input
     index:
         Index of the desired spectrum in the .imzML file
+    centroided:
+        If True, performs centroid detection on the spectrum before returning it.
+        False by default
 
     output
     mzArray:
@@ -238,12 +244,14 @@ class ImzMLParser:
     intensityArray:
         List of intensity values corresponding to mzArray
     """
-    def getspectrum(self, index):
+    def getspectrum(self, index, centroided=False):
         mzString, intensityString = self.get_spectrum_as_string(index)
         mzFmt = '<'+str(int(len(mzString)/self.sizeDict[self.mzPrecision]))+self.mzPrecision
         intensityFmt = '<'+str(int(len(intensityString)/self.sizeDict[self.intensityPrecision]))+self.intensityPrecision
         mzArray = struct.unpack(mzFmt, mzString)
         intensityArray = struct.unpack(intensityFmt, intensityString)
+        if centroided:
+            mzArray, intensityArray = centroid_detection.gradient(np.array(mzArray), np.array(intensityArray), weighted_bins=0)[:2]
         return mzArray, intensityArray
 
     """
@@ -296,7 +304,6 @@ class ImzMLParser:
     def getionimage(self, mzValue, tol=0.1, z=None):
         # import numpy here locally, in order to have the rest of the code
         # working if numpy is not installed
-        import numpy as np
         tol = abs(tol)
         im = None
         if z:
