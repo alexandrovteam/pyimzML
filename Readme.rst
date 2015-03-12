@@ -15,8 +15,12 @@ should be installed with pip using one of these three options:
 * ``$ pip install git+git://github.com/pyIMS/pyimzML.git`` will install pyimzML from github.
 * Download the source tarball from `PyPI <https://pypi.python.org/pypi/pyimzML>`_ and ``$ pip install pyimzml-x-x-x.tar.gz``
 
-Note: If numpy is not preinstalled, pip will build it from source before
-installing pyimzML. This can take several minutes.
+*Note: If numpy is not preinstalled, pip will build it from source before
+installing pyimzML. This can take several minutes.*
+
+**Testing**
+
+To test your installation of pyimzML, you can download sample data from `imzml.org <http://imzml.org/index.php?option=com_content&view=article&id=186&Itemid=68>`_ and go through the following use cases.
 
 Usage
 -----
