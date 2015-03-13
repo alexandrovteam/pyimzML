@@ -79,10 +79,10 @@ class ImzMLParser:
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method readimzmlmeta()
         self.imzmldict = self.readimzmlmeta()
-    # system method for use of 'with ... as' (not working yet, do not use)
+    # system method for use of 'with ... as'
     def __enter__(self):
-        pass
-    # system method for use of 'with ... as' (not working yet, do not use)
+        return self
+    # system method for use of 'with ... as'
     def __exit__(self, exc_t, exc_v, trace):
         self.m.close()
 
