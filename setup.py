@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='pyimzML',
-    version='1.1.0',
+    version='1.0.1',
     description="Parser for conversion of imzML 1.1.0 files",
     long_description="""
 Parser for conversion of imzML 1.1.0 files.
@@ -13,7 +13,6 @@ All Python versions from 2.7 on are supported, but Python 3.3 or newer is
 recommended for performance reasons.""",
     # The project's main homepage.
     url='https://github.com/pyIMS/pyimzML',
-    # Author details
     author='Dominik Fay',
     author_email='dominik.fay@embl.de',
 
@@ -35,8 +34,6 @@ recommended for performance reasons.""",
     ],
     keywords='bioinformatics imaging mass spectrometry parser imzML',
 
-    # You can just specify the packages manually here if your project is
-    # simple. Or you can use find_packages().
     # packages=find_packages(),
     packages=['pyimzml'],
 
