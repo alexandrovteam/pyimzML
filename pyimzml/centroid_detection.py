@@ -45,9 +45,9 @@ def gradient(mzs,intensities,**opt_args):
         if key in function_args.keys():
             function_args[key] = val
         else:
-            print 'possible arguments:'
+            print ('possible arguments:')
             for i in function_args.keys():
-                   print i
+                   print (i)
             raise NameError('gradient does not take argument: %s'%(key))
     mzMaxNum = function_args['max_output']
     weighted_bins = function_args['weighted_bins']
