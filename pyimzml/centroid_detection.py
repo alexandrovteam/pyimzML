@@ -41,7 +41,8 @@ indices_list:
 """
 def gradient(mzs,intensities,**opt_args):
     function_args = {'max_output': -1, 'weighted_bins':1,'min_intensity':0}
-    for key, val in opt_args.iteritems():
+    # for key, val in opt_args.iteritems():
+    for key, val in opt_args.items():
         if key in function_args.keys():
             function_args[key] = val
         else:

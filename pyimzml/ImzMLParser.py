@@ -22,7 +22,7 @@ import numpy as np
 import struct
 from warnings import warn
 
-import centroid_detection
+from . import centroid_detection
 
 """
 Parser for imzML 1.1.0 files (see specification here:
