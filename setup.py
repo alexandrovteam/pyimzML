@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='pyimzML',
-    version='1.0.1',
+    version='1.0.2',
     description="Parser for conversion of imzML 1.1.0 files",
     long_description="""
 Parser for conversion of imzML 1.1.0 files.
