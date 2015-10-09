@@ -305,10 +305,12 @@ class ImzMLParser:
         return mz_string, intensity_string
 
 
-def getionimage(p, mz_value, tol=0.1, z=None):
+def getionimage(p, mz_value, tol=0.1, z=None, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
+
+    By default, the intensity values within the tolerance region are summed.
 
     :param p:
         the ImzMLParser (or anything else with similar attributes) for the desired dataset
@@ -319,6 +321,9 @@ def getionimage(p, mz_value, tol=0.1, z=None):
         mz_value-|tol| <= x <= mz_value+|tol| are included. Defaults to 0.1
     :param z:
         z Value if spectrogram is 3-dimensional.
+    :param reduce_func:
+        the bahaviour for reducing the intensities between mz_value-|tol| and mz_value+|tol| to a single value. Must
+        be a function that takes a sequence as input and outputs a number. By default, the values are summed.
 
     :return:
         numpy matrix with each element representing the ion intensity in this
@@ -330,13 +335,13 @@ def getionimage(p, mz_value, tol=0.1, z=None):
         for i, (x, y, z) in enumerate(p.coordinates):
             mzs, ints = p.getspectrum(i)
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1, z - 1] = max(ints[min_i:max_i])
+            im[y - 1, x - 1, z - 1] = reduce_func(ints[min_i:max_i])
     else:
         im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
         for i, (x, y,) in enumerate(p.coordinates):
             mzs, ints = p.getspectrum(i)
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1] = max(ints[min_i:max_i])
+            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i])
     return im
 
 
