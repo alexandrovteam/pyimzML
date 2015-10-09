@@ -14,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
 from xml.etree import ElementTree
 import mmap
-import numpy as np
 import struct
 from warnings import warn
+
+import numpy as np
 
 
 class ImzMLParser:
@@ -33,6 +34,7 @@ class ImzMLParser:
     coordinates with their respective index. Relevant meta data is stored in
     parser.imzmldict
     """
+
     def __init__(self, filename):
         """
         Opens the two files corresponding to the file name, reads the entire .imzML
@@ -48,9 +50,9 @@ class ImzMLParser:
         # for all imzML files, it is hard-coded here and prepended before every tag
         self.sl = "{http://psi.hupo.org/ms/mzml}"
         # maps each imzML number format to its struct equivalent
-        self.precisionDict = {"32-bit float" : 'f', "64-bit float" : 'd', "32-bit integer" : 'i', "64-bit integer" : 'l'}
+        self.precisionDict = {"32-bit float": 'f', "64-bit float": 'd', "32-bit integer": 'i', "64-bit integer": 'l'}
         # maps each number format character to its amount of bytes used
-        self.sizeDict = {'f' : 4, 'd' : 8, 'i' : 4, 'l' : 8}
+        self.sizeDict = {'f': 4, 'd': 8, 'i': 4, 'l': 8}
         self.filename = filename
         self.mzOffsets = []
         self.intensityOffsets = []
@@ -60,8 +62,8 @@ class ImzMLParser:
         self.coordinates = []
         self.root = ElementTree.parse(filename).getroot()
         # name of the binary file
-        binFilename = self.filename[:-5] + "ibd"
-        f = open(binFilename, "rb")
+        bin_filename = self.filename[:-5] + "ibd"
+        f = open(bin_filename, "rb")
         # try memory mapping if possible
         try:
             self.m = mmap.mmap(f.fileno(), mapsize, access=mmap.ACCESS_READ)
@@ -74,9 +76,11 @@ class ImzMLParser:
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method readimzmlmeta()
         self.imzmldict = self.readimzmlmeta()
+
     # system method for use of 'with ... as'
     def __enter__(self):
         return self
+
     # system method for use of 'with ... as'
     def __exit__(self, exc_t, exc_v, trace):
         self.m.close()
@@ -91,44 +95,44 @@ class ImzMLParser:
 
         Output:
 
-        mzPrecision:
+        mz_precision:
             number format for mz array as string specified above
-        intensityPrecision:
+        intensity_precision:
             number format for intensity array as string specified above
 
         :rtype: Tuple[str, str]
         :raises RuntimeError:
             if the format string could not be found.
         """
-        validAccessionStrings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
+        valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
 
-        paramGroupList = self.root.find('%sreferenceableParamGroupList' % (self.sl))
-        paramGroups = paramGroupList.findall('%sreferenceableParamGroup' % (self.sl))
-        mzGroup = None
-        intGroup = None
-        mzPrecision = None
-        intPrecision = None
-        for group in paramGroups:
+        param_group_list = self.root.find('%sreferenceableParamGroupList' % self.sl)
+        param_groups = param_group_list.findall('%sreferenceableParamGroup' % self.sl)
+        mz_group = None
+        int_group = None
+        mz_precision = None
+        int_precision = None
+        for group in param_groups:
             for param in group:
                 if param.attrib["name"] == "m/z array":
-                    mzGroup = group
+                    mz_group = group
                     self.mzGroupId = group.attrib["id"]
                 elif param.attrib["name"] == "intensity array":
-                    intGroup = group
+                    int_group = group
                     self.intGroupId = group.attrib["id"]
-        for s in validAccessionStrings:
-            param = mzGroup.find('%scvParam[@accession="%s"]' % (self.sl, s))
+        for s in valid_accession_strings:
+            param = mz_group.find('%scvParam[@accession="%s"]' % (self.sl, s))
             if param is not None:
-                mzPrecision = self.precisionDict[param.attrib["name"]]
+                mz_precision = self.precisionDict[param.attrib["name"]]
                 break
-        for s in validAccessionStrings:
-            param = intGroup.find('%scvParam[@accession="%s"]' % (self.sl, s))
+        for s in valid_accession_strings:
+            param = int_group.find('%scvParam[@accession="%s"]' % (self.sl, s))
             if param is not None:
-                intPrecision = self.precisionDict[param.attrib["name"]]
+                int_precision = self.precisionDict[param.attrib["name"]]
                 break
-        if (mzPrecision is None) or (intPrecision is None):
-            raise RuntimeError("Unsupported number format: mz = %s, int = %s" % (mzPrecision, intPrecision))
-        return mzPrecision, intPrecision
+        if (mz_precision is None) or (int_precision is None):
+            raise RuntimeError("Unsupported number format: mz = %s, int = %s" % (mz_precision, int_precision))
+        return mz_precision, int_precision
 
     def readspectrummeta(self):
         """
@@ -136,35 +140,35 @@ class ImzMLParser:
         Initializes the attributes mzOffsets, mzLengths, intensityOffsets,
         coordinates and intensityLenghts with their respective values read from the xml tree.
         """
-        runElem = self.root.find('%srun' % (self.sl))
-        specListElem = runElem.find('%sspectrumList' % (self.sl))
-        for spectrumElem in list(specListElem):
-            arrListElem = spectrumElem.find('%sbinaryDataArrayList' % (self.sl))
-            eList = list(arrListElem)
-            eListSorted = [None, None]
-            for e in eList:
-                ref = e.find('%sreferenceableParamGroupRef' % (self.sl)).attrib["ref"]
+        runelem = self.root.find('%srun' % self.sl)
+        speclistelem = runelem.find('%sspectrumList' % self.sl)
+        for spectrumElem in list(speclistelem):
+            arrlistelem = spectrumElem.find('%sbinaryDataArrayList' % self.sl)
+            elist = list(arrlistelem)
+            elist_sorted = [None, None]
+            for e in elist:
+                ref = e.find('%sreferenceableParamGroupRef' % self.sl).attrib["ref"]
                 if ref == self.mzGroupId:
-                    eListSorted[0] = e
+                    elist_sorted[0] = e
                 elif ref == self.intGroupId:
-                    eListSorted[1] = e
-            mzOffsetElem = eListSorted[0].find('%scvParam[@accession="IMS:1000102"]' % (self.sl))
-            self.mzOffsets.append(int(mzOffsetElem.attrib["value"]))
-            mzLengthElem = eListSorted[0].find('%scvParam[@accession="IMS:1000103"]' % (self.sl))
-            self.mzLengths.append(int(mzLengthElem.attrib["value"]))
-            intensityOffsetElem = eListSorted[1].find('%scvParam[@accession="IMS:1000102"]' % (self.sl))
-            self.intensityOffsets.append(int(intensityOffsetElem.attrib["value"]))
-            intensityLengthElem = eListSorted[1].find('%scvParam[@accession="IMS:1000103"]' % (self.sl))
-            self.intensityLengths.append(int(intensityLengthElem.attrib["value"]))
+                    elist_sorted[1] = e
+            mz_offset_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
+            self.mzOffsets.append(int(mz_offset_elem.attrib["value"]))
+            mz_length_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
+            self.mzLengths.append(int(mz_length_elem.attrib["value"]))
+            intensity_offset_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
+            self.intensityOffsets.append(int(intensity_offset_elem.attrib["value"]))
+            intensity_length_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
+            self.intensityLengths.append(int(intensity_length_elem.attrib["value"]))
 
-            scanElem = spectrumElem.find('%sscanList/%sscan' % (self.sl, self.sl))
-            x = scanElem.find('%scvParam[@accession="IMS:1000050"]' % self.sl).attrib["value"]
-            y = scanElem.find('%scvParam[@accession="IMS:1000051"]' % self.sl).attrib["value"]
+            scan_elem = spectrumElem.find('%sscanList/%sscan' % (self.sl, self.sl))
+            x = scan_elem.find('%scvParam[@accession="IMS:1000050"]' % self.sl).attrib["value"]
+            y = scan_elem.find('%scvParam[@accession="IMS:1000051"]' % self.sl).attrib["value"]
             try:
-                z = scanElem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
-                self.coordinates.append((int(x),int(y),int(z)))
+                z = scan_elem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
+                self.coordinates.append((int(x), int(y), int(z)))
             except AttributeError:
-                self.coordinates.append((int(x),int(y)))
+                self.coordinates.append((int(x), int(y)))
 
     def readimzmlmeta(self):
         """
@@ -186,36 +190,36 @@ class ImzMLParser:
             if an xml attribute has a number format different from the imzML specification
         """
         d = {}
-        scanSettingsListElem = self.root.find('%sscanSettingsList' % (self.sl))
-        instrumentConfigListElem = self.root.find('%sinstrumentConfigurationList' % (self.sl))
-        supportedParams1 = [("max count of pixels x", int), ("max count of pixels y",int),
-        ("max dimension x",int), ("max dimension y",int), ("pixel size x",float),
-        ("pixel size y",float), ("matrix solution concentration",float)]
-        supportedParams2 = [("wavelength",float),
-        ("focus diameter x",float), ("focus diameter y",float), ("pulse energy",float),
-        ("pulse duration",float), ("attenuation",float)]
-        supportedAccessions1 = [("IMS:1000042", "value"), ("IMS:1000043", "value"),
-        ("IMS:1000044", "value"), ("IMS:1000045", "value"),
-        ("IMS:1000046", "value"), ("IMS:1000047", "value"), ("MS:1000835", "value")]
-        supportedAccessions2 = [("MS:1000843", "value"), ("MS:1000844", "value"),
-        ("MS:1000845", "value"), ("MS:1000846", "value"), ("MS:1000847", "value"),
-        ("MS:1000848", "value")]
-        for i in range(len(supportedParams1)):
-            acc, attr = supportedAccessions1[i]
-            elem = scanSettingsListElem.find('.//%scvParam[@accession="%s"]' % (self.sl, acc))
+        scan_settings_list_elem = self.root.find('%sscanSettingsList' % self.sl)
+        instrument_config_list_elem = self.root.find('%sinstrumentConfigurationList' % self.sl)
+        supportedparams1 = [("max count of pixels x", int), ("max count of pixels y", int),
+                            ("max dimension x", int), ("max dimension y", int), ("pixel size x", float),
+                            ("pixel size y", float), ("matrix solution concentration", float)]
+        supportedparams2 = [("wavelength", float),
+                            ("focus diameter x", float), ("focus diameter y", float), ("pulse energy", float),
+                            ("pulse duration", float), ("attenuation", float)]
+        supportedaccessions1 = [("IMS:1000042", "value"), ("IMS:1000043", "value"),
+                                ("IMS:1000044", "value"), ("IMS:1000045", "value"),
+                                ("IMS:1000046", "value"), ("IMS:1000047", "value"), ("MS:1000835", "value")]
+        supportedaccessions2 = [("MS:1000843", "value"), ("MS:1000844", "value"),
+                                ("MS:1000845", "value"), ("MS:1000846", "value"), ("MS:1000847", "value"),
+                                ("MS:1000848", "value")]
+        for i in range(len(supportedparams1)):
+            acc, attr = supportedaccessions1[i]
+            elem = scan_settings_list_elem.find('.//%scvParam[@accession="%s"]' % (self.sl, acc))
             if elem is None:
                 break
-            name, T = supportedParams1[i]
+            name, T = supportedparams1[i]
             try:
                 d[name] = T(elem.attrib[attr])
             except ValueError:
                 warn(Warning('Wrong data type in XML file. Skipped attribute "%s"' % name))
-        for i in range(len(supportedParams2)):
-            acc, attr = supportedAccessions2[i]
-            elem = instrumentConfigListElem.find('.//%scvParam[@accession="%s"]' % (self.sl, acc))
+        for i in range(len(supportedparams2)):
+            acc, attr = supportedaccessions2[i]
+            elem = instrument_config_list_elem.find('.//%scvParam[@accession="%s"]' % (self.sl, acc))
             if elem is None:
                 break
-            name, T = supportedParams2[i]
+            name, T = supportedparams2[i]
             try:
                 d[name] = T(elem.attrib[attr])
             except ValueError:
@@ -236,7 +240,7 @@ class ImzMLParser:
         try:
             pixel_size_x = self.imzmldict["pixel size x"]
             pixel_size_y = self.imzmldict["pixel size y"]
-        except KeyError as e:
+        except KeyError:
             raise KeyError("Could not find all pixel size attributes in imzML file")
         image_x, image_y = self.coordinates[i]
         return image_x * pixel_size_x, image_y * pixel_size_y
@@ -250,18 +254,19 @@ class ImzMLParser:
 
         Output:
 
-        mzArray:
+        mz_array:
             Sequence of m/z values representing the horizontal axis of the desired mass
             spectrum
-        intensityArray:
-            Sequence of intensity values corresponding to mzArray
+        intensity_array:
+            Sequence of intensity values corresponding to mz_array
         """
-        mzString, intensityString = self.get_spectrum_as_string(index)
-        mzFmt = '<'+str(int(len(mzString)/self.sizeDict[self.mzPrecision]))+self.mzPrecision
-        intensityFmt = '<'+str(int(len(intensityString)/self.sizeDict[self.intensityPrecision]))+self.intensityPrecision
-        mzArray = struct.unpack(mzFmt, mzString)
-        intensityArray = struct.unpack(intensityFmt, intensityString)
-        return mzArray, intensityArray
+        mz_string, intensity_string = self.get_spectrum_as_string(index)
+        mz_fmt = '<' + str(int(len(mz_string) / self.sizeDict[self.mzPrecision])) + self.mzPrecision
+        intensity_fmt = '<' + str(
+            int(len(intensity_string) / self.sizeDict[self.intensityPrecision])) + self.intensityPrecision
+        mz_array = struct.unpack(mz_fmt, mz_string)
+        intensity_array = struct.unpack(intensity_fmt, intensity_string)
+        return mz_array, intensity_array
 
     def get_spectrum_as_string(self, index):
         """
@@ -275,24 +280,22 @@ class ImzMLParser:
 
         Output:
 
-        mzString:
+        mz_string:
             string where each character represents a byte of the mz array of the
             spectrum
-        intensityString:
+        intensity_string:
             string where each character represents a byte of the intensity array of
             the spectrum
         """
         offsets = [self.mzOffsets[index], self.intensityOffsets[index]]
         lengths = [self.mzLengths[index], self.intensityLengths[index]]
-        lengths[0] = lengths[0]*self.sizeDict[self.mzPrecision]
-        lengths[1] = lengths[1]*self.sizeDict[self.intensityPrecision]
-        mzString = ""
-        intensityString = ""
+        lengths[0] *= self.sizeDict[self.mzPrecision]
+        lengths[1] *= self.sizeDict[self.intensityPrecision]
         self.m.seek(offsets[0])
-        mzString = self.m.read(lengths[0])
+        mz_string = self.m.read(lengths[0])
         self.m.seek(offsets[1])
-        intensityString = self.m.read(lengths[1])
-        return mzString, intensityString
+        intensity_string = self.m.read(lengths[1])
+        return mz_string, intensity_string
 
 
 def getionimage(p, mz_value, tol=0.1, z=None):
@@ -315,21 +318,20 @@ def getionimage(p, mz_value, tol=0.1, z=None):
         pixel. Can be easily plotted with matplotlib
     """
     tol = abs(tol)
-    im = None
     if z:
         im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"], z))
         for i, (x, y, z) in enumerate(p.coordinates):
             mzs, ints = p.getspectrum(i)
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y-1, x-1, z-1] = max(ints[min_i:max_i])
+            im[y - 1, x - 1, z - 1] = max(ints[min_i:max_i])
     else:
         im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
         for i, (x, y,) in enumerate(p.coordinates):
             mzs, ints = p.getspectrum(i)
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y-1, x-1] = max(ints[min_i:max_i])
+            im[y - 1, x - 1] = max(ints[min_i:max_i])
     return im
 
 
 def _bisect_spectrum(mzs, mz_value, tol):
-    return bisect_left(mzs, mz_value-tol), bisect_left(mzs, mz_value+tol) + 1
+    return bisect_left(mzs, mz_value - tol), bisect_left(mzs, mz_value + tol) + 1
