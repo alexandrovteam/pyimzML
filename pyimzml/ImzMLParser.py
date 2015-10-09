@@ -224,6 +224,25 @@ class ImzMLParser:
                 warn(Warning('Wrong data type in XML file. Skipped attribute "%s"' % name))
         return d
 
+    def get_physical_coordinates(self, i):
+        """
+        For a pixel index i, return the real-world coordinates in nanometers.
+
+        This is equivalent to multiplying the image coordinates of the given pixel with the pixel size.
+
+        :param i: the pixel index
+        :return: a tuple of x and y coordinates.
+        :rtype: Tuple[float]
+        :raises KeyError: if the .imzML file does not specify the attributes "pixel size x" and "pixel size y"
+        """
+        try:
+            pixel_size_x = self.imzmldict["pixel size x"]
+            pixel_size_y = self.imzmldict["pixel size y"]
+        except KeyError as e:
+            raise KeyError("Could not find all pixel size attributes in imzML file")
+        image_x, image_y = self.coordinates[i]
+        return image_x * pixel_size_x, image_y * pixel_size_y
+
     """
     Reads the spectrum at specified index from the .ibd file.
 
