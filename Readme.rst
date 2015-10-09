@@ -17,7 +17,7 @@ pyimzML is available on `PyPI <https://pypi.python.org/pypi/pyimzML>`_. pyimzML
 should be installed with pip using one of these three options:
 
 * ``$ pip install pyimzml`` will install pyimzML from PyPI (easiest).
-* ``$ pip install git+git://github.com/pyIMS/pyimzML.git`` will install pyimzML from github.
+* ``$ pip install git+git://github.com/alexandrovteam/pyimzML.git`` will install pyimzML from github.
 * Download the source tarball from `PyPI <https://pypi.python.org/pypi/pyimzML>`_ and ``$ pip install pyimzml-x-x-x.tar.gz``
 
 *Note: If numpy is not preinstalled, pip will build it from source before
@@ -65,15 +65,17 @@ and can be plotted easily::
 **Ion images**
 
 Now, we want an image displaying the intensity of an ion throughout the
-spectrogram. Therefore, we use the getionimage method, which returns a numpy
+spectrogram. Therefore, we use the getionimage function, which returns a numpy
 matrix that can be displayed as an image by ``matplotlib``::
+
+    from pyimzml.ImzMLParser import getionimage
 
     # pick a base peak
     mzA, intA = p.getspectrum(1)
     peakMz = mzA[intA.index(max(intA))]
 
     # show the image
-    im = p.getionimage(peakMz)
+    im = getionimage(p, peakMz)
     plt.imshow(im).set_interpolation('nearest')
     plt.colorbar()
     plt.show()
