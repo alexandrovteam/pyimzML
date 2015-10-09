@@ -295,40 +295,42 @@ class ImzMLParser:
         intensityString = self.m.read(lengths[1])
         return mzString, intensityString
 
+
+def getionimage(p, mz_value, tol=0.1, z=None):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
 
-    input
-    mzValue:
+    :param p:
+        the ImzMLParser (or anything else with similar attributes) for the desired dataset
+    :param mz_value:
         m/z value for which the ion image shall be returned
-    tol:
+    :param tol:
         Absolute tolerance for the m/z value, such that all ions with values
-        mzValue-|tol| <= x <= mzValue+|tol| are included. Defaults to 0.1
-    z:
+        mz_value-|tol| <= x <= mz_value+|tol| are included. Defaults to 0.1
+    :param z:
         z Value if spectrogram is 3-dimensional.
 
-    output
+    :return:
         numpy matrix with each element representing the ion intensity in this
         pixel. Can be easily plotted with matplotlib
     """
-    def getionimage(self, mzValue, tol=0.1, z=None):
-        # import numpy here locally, in order to have the rest of the code
-        # working if numpy is not installed
-        tol = abs(tol)
-        im = None
-        if z:
-            im = np.zeros((self.imzmldict["max count of pixels y"], self.imzmldict["max count of pixels x"], z))
-            for i, (x,y,z) in enumerate(self.coordinates):
-                mzA, intA = self.getspectrum(i)
-                minI = bisect_left(mzA, mzValue-tol)
-                maxI = bisect_left(mzA, mzValue+tol)+1
-                im[y-1,x-1,z-1] = max(intA[minI:maxI])
-        else:
-            im = np.zeros((self.imzmldict["max count of pixels y"], self.imzmldict["max count of pixels x"]))
-            for i, (x,y,) in enumerate(self.coordinates):
-                mzA, intA = self.getspectrum(i)
-                minI = bisect_left(mzA, mzValue-tol)
-                maxI = bisect_left(mzA, mzValue+tol)+1
-                im[y-1,x-1] = max(intA[minI:maxI])
-        return im
+    tol = abs(tol)
+    im = None
+    if z:
+        im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"], z))
+        for i, (x, y, z) in enumerate(p.coordinates):
+            mzs, ints = p.getspectrum(i)
+            min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
+            im[y-1, x-1, z-1] = max(ints[min_i:max_i])
+    else:
+        im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
+        for i, (x, y,) in enumerate(p.coordinates):
+            mzs, ints = p.getspectrum(i)
+            min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
+            im[y-1, x-1] = max(ints[min_i:max_i])
+    return im
+
+
+def _bisect_spectrum(mzs, mz_value, tol):
+    return bisect_left(mzs, mz_value-tol), bisect_left(mzs, mz_value+tol) + 1
