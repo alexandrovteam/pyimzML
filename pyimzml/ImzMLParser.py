@@ -15,7 +15,14 @@
 # limitations under the License.
 
 from bisect import bisect_left
-from xml.etree import ElementTree
+
+try:
+    from lxml.etree import ElementTree
+except ImportError:
+    try:
+        from xml.etree import cElementTree as ElementTree
+    except ImportError:
+        from xml.etree import ElementTree
 import mmap
 import struct
 from warnings import warn

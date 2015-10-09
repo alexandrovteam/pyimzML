@@ -20,8 +20,10 @@ should be installed with pip using one of these three options:
 * ``$ pip install git+git://github.com/alexandrovteam/pyimzML.git`` will install pyimzML from github.
 * Download the source tarball from `PyPI <https://pypi.python.org/pypi/pyimzML>`_ and ``$ pip install pyimzml-x-x-x.tar.gz``
 
-*Note: If numpy is not preinstalled, pip will build it from source before
-installing pyimzML. This can take several minutes.*
+**Dependency Notes**
+
+* If numpy is not preinstalled, pip will build it from source before installing pyimzML. This can take several minutes.
+* pyimzML has an optional dependency to `lxml <http://lxml.de/index.html>`_. If lxml is not installed, pyimzML will instead use the built-in cElementTree or ElementTree package.
 
 **Testing**
 
