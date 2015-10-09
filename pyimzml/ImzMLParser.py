@@ -21,28 +21,26 @@ import numpy as np
 import struct
 from warnings import warn
 
-"""
-Parser for imzML 1.1.0 files (see specification here:
-http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf).
 
-Reads the .imzML file into memory once and entirely during initialization and
-returns a spectrum upon calling getspectrum(i). The binary file is read in
-every call of getspectrum(i). Use enumerate(parser.coordinates) to get all
-coordinates with their respective index. Relevant meta data is stored in
-parser.imzmldict
-"""
 class ImzMLParser:
     """
-    Opens the two files corresponding to the file name, reads the entire .imzML
-    file and extracts required attributes. Does not read any binary data, yet.
+    Parser for imzML 1.1.0 files (see specification here:
+    http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf).
 
-    input
-    filename:
-        name of the XML file. Must end with .imzML. Binary data file must be
-        named equally ending with .ibd
+    Reads the .imzML file into memory once and entirely during initialization and
+    returns a spectrum upon calling getspectrum(i). The binary file is read in
+    every call of getspectrum(i). Use enumerate(parser.coordinates) to get all
+    coordinates with their respective index. Relevant meta data is stored in
+    parser.imzmldict
     """
-    # def __init__(self, filename, mapsize=0):
     def __init__(self, filename):
+        """
+        Opens the two files corresponding to the file name, reads the entire .imzML
+        file and extracts required attributes. Does not read any binary data, yet.
+
+        :param filename:
+            name of the XML file. Must end with .imzML. Binary data file must be named equally but ending with .ibd
+        """
         # custom map sizes are currently not supported, therefore mapsize is hardcoded.
         mapsize = 0
         # ElementTree requires the schema location for finding tags (why?) but
@@ -83,24 +81,25 @@ class ImzMLParser:
     def __exit__(self, exc_t, exc_v, trace):
         self.m.close()
 
-    """
-    This method should only be called by __init__
-    Reads the number formatting strings from the xml tree stored in the name
-    attribute of cvParams with accession values "MS:1000521", "MS:1000523",
-    "IMS:1000141" or "IMS:1000142". The string values are "32-bit float",
-    "64-bit float", "32-bit integer", "64-bit integer".
-
-    output
-    mzPrecision:
-        number format for mz array as string specified above
-    intensityPrecision:
-        number format for intensity array as string specified above
-
-    Exceptions
-    RuntimeError:
-        if the format string could not be found.
-    """
     def readformats(self):
+        """
+        This method should only be called by __init__.
+        Reads the number formatting strings from the xml tree stored in the name
+        attribute of cvParams with accession values "MS:1000521", "MS:1000523",
+        "IMS:1000141" or "IMS:1000142". The string values are "32-bit float",
+        "64-bit float", "32-bit integer", "64-bit integer".
+
+        Output:
+
+        mzPrecision:
+            number format for mz array as string specified above
+        intensityPrecision:
+            number format for intensity array as string specified above
+
+        :rtype: Tuple[str, str]
+        :raises RuntimeError:
+            if the format string could not be found.
+        """
         validAccessionStrings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
 
         paramGroupList = self.root.find('%sreferenceableParamGroupList' % (self.sl))
@@ -131,12 +130,12 @@ class ImzMLParser:
             raise RuntimeError("Unsupported number format: mz = %s, int = %s" % (mzPrecision, intPrecision))
         return mzPrecision, intPrecision
 
-    """
-    This method should only be called by __init__.
-    Initializes the attributes mzOffsets, mzLengths, intensityOffsets,
-    coordinates and intensityLenghts with their respective values read from the xml tree.
-    """
     def readspectrummeta(self):
+        """
+        This method should only be called by __init__.
+        Initializes the attributes mzOffsets, mzLengths, intensityOffsets,
+        coordinates and intensityLenghts with their respective values read from the xml tree.
+        """
         runElem = self.root.find('%srun' % (self.sl))
         specListElem = runElem.find('%sspectrumList' % (self.sl))
         for spectrumElem in list(specListElem):
@@ -167,26 +166,25 @@ class ImzMLParser:
             except AttributeError:
                 self.coordinates.append((int(x),int(y)))
 
-    """
-    This method should only be called by __init__.
-    Initializes the imzmldict with frequently used metadata ftom the .imzML file.
-    This dict keys are incomplete and may be extended in the future. The keys are named
-    similarly to the imzML names. Currently supported keys:
-    "max dimension x", "max dimension y", "pixel size x", "pixel size y",
-    "matrix solution concentration", "wavelength", "focus diameter x",
-    "focus diameter y", "pulse energy", "pulse duration", "attenuation".
-
-    If a key is not found in the XML tree, it will not be in the dict either.
-
-    Output
-    d:
-        Dict containing above mentioned meta data
-
-    Warnings
-    Warning:
-        if an xml attribute has a number format different from the imzML specificateion
-    """
     def readimzmlmeta(self):
+        """
+        This method should only be called by __init__. Initializes the imzmldict with frequently used metadata from
+        the .imzML file.
+
+        This method reads only a subset of the available meta information and may be extended in the future. The keys
+        are named similarly to the imzML names. Currently supported keys: "max dimension x", "max dimension y",
+        "pixel size x", "pixel size y", "matrix solution concentration", "wavelength", "focus diameter x",
+        "focus diameter y", "pulse energy", "pulse duration", "attenuation".
+
+        If a key is not found in the XML tree, it will not be in the dict either.
+
+        :return d:
+            dict containing above mentioned meta data
+        :rtype:
+            dict
+        :raises Warning:
+            if an xml attribute has a number format different from the imzML specification
+        """
         d = {}
         scanSettingsListElem = self.root.find('%sscanSettingsList' % (self.sl))
         instrumentConfigListElem = self.root.find('%sinstrumentConfigurationList' % (self.sl))
@@ -243,21 +241,21 @@ class ImzMLParser:
         image_x, image_y = self.coordinates[i]
         return image_x * pixel_size_x, image_y * pixel_size_y
 
-    """
-    Reads the spectrum at specified index from the .ibd file.
-
-    input
-    index:
-        Index of the desired spectrum in the .imzML file
-
-    output
-    mzArray:
-        List of m/z values representing the horizontal axis of the desired mass
-        spectrum
-    intensityArray:
-        List of intensity values corresponding to mzArray
-    """
     def getspectrum(self, index):
+        """
+        Reads the spectrum at specified index from the .ibd file.
+
+        :param index:
+            Index of the desired spectrum in the .imzML file
+
+        Output:
+
+        mzArray:
+            Sequence of m/z values representing the horizontal axis of the desired mass
+            spectrum
+        intensityArray:
+            Sequence of intensity values corresponding to mzArray
+        """
         mzString, intensityString = self.get_spectrum_as_string(index)
         mzFmt = '<'+str(int(len(mzString)/self.sizeDict[self.mzPrecision]))+self.mzPrecision
         intensityFmt = '<'+str(int(len(intensityString)/self.sizeDict[self.intensityPrecision]))+self.intensityPrecision
@@ -265,24 +263,25 @@ class ImzMLParser:
         intensityArray = struct.unpack(intensityFmt, intensityString)
         return mzArray, intensityArray
 
-    """
-    Reads m/z array and intensity array of the spectrum at specified location
-    from the binary file as a string. The string can be unpacked by the struct
-    module. To get the arrays as numbers, use getspectrum
-
-    input
-    index:
-        Index of the desired spectrum in the .imzML file
-
-    output
-    mzString:
-        string where each character represents a byte of the mz array of the
-        spectrum
-    intensityString:
-        string where each character represents a byte of the intensity array of
-        the spectrum
-    """
     def get_spectrum_as_string(self, index):
+        """
+        Reads m/z array and intensity array of the spectrum at specified location
+        from the binary file as a byte string. The string can be unpacked by the struct
+        module. To get the arrays as numbers, use getspectrum
+
+        :param index:
+            Index of the desired spectrum in the .imzML file
+        :rtype: Tuple[str, str]
+
+        Output:
+
+        mzString:
+            string where each character represents a byte of the mz array of the
+            spectrum
+        intensityString:
+            string where each character represents a byte of the intensity array of
+            the spectrum
+        """
         offsets = [self.mzOffsets[index], self.intensityOffsets[index]]
         lengths = [self.mzLengths[index], self.intensityLengths[index]]
         lengths[0] = lengths[0]*self.sizeDict[self.mzPrecision]
