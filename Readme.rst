@@ -34,7 +34,9 @@ Usage
 **Init**
 
 First, we instanciate the parser. This will parse the entire .imzML file and
-store the xml tree in memory::
+store the xml tree in memory
+
+.. code-block:: python
 
     from pyimzml.ImzMLParser import ImzMLParser
 
@@ -51,13 +53,17 @@ different format, for example). Spectra are accessed by their index in the
 two reading accesses in the binary file: One for the m/z array, one for the
 intensity array. The coordinate of an index can be looked up in the attribute
 ``coordinates``. As spectral data images are not neccessarily rectangular, the
-following generalized approach is recommended::
+following generalized approach is recommended
+
+.. code-block:: python
 
     for i, (x,y) in enumerate(p.coordinates):
         p.getspectrum(i)
 
 Each spectrum is a tuple of two lists, the m/z array and the intensity array,
-and can be plotted easily::
+and can be plotted easily
+
+.. code-block:: python
 
     import matplotlib.pyplot as plt
 
@@ -68,7 +74,9 @@ and can be plotted easily::
 
 Now, we want an image displaying the intensity of an ion throughout the
 spectrogram. Therefore, we use the getionimage function, which returns a numpy
-matrix that can be displayed as an image by ``matplotlib``::
+matrix that can be displayed as an image by ``matplotlib``
+
+.. code-block:: python
 
     from pyimzml.ImzMLParser import getionimage
 
