@@ -1,5 +1,5 @@
 pyimzML
-=============
+=======
 Description
 -----------
 A parser for the imzML format used in imaging mass spectrometry. See specification
@@ -9,7 +9,7 @@ Designed for use with imzML version 1.1.0. Outputs data as python lists and dict
 The parser is developed by `Alexandrov Team <http://www.embl.de/research/units/scb/alexandrov/index.html>`_ at EMBL Heidelberg.
 
 * Developer: Dominik Fay
-* Contact: Andrew Palmer
+* Contact and feedback: `Team contact <http://www.embl.de/research/units/scb/alexandrov/contact/index.html>`_
 
 Installation
 ------------
