@@ -26,8 +26,11 @@ except ImportError:
 import mmap
 import struct
 from warnings import warn
-
 import numpy as np
+
+param_group_elname = "referenceableParamGroup"
+data_processing_elname = "dataProcessing"
+instrument_confid_elname = "instrumentConfiguration"
 
 
 class ImzMLParser:
@@ -345,5 +348,73 @@ def getionimage(p, mz_value, tol=0.1, z=None, reduce_func=sum):
     return im
 
 
+def browse(p):
+    """
+    Create a metadata browser for the parser.
+    :param p: the parser
+    :return: the browser
+    """
+    return _ImzMLMetaDataBrowser(p.root, p.sl)
+
+
 def _bisect_spectrum(mzs, mz_value, tol):
     return bisect_left(mzs, mz_value - tol), bisect_left(mzs, mz_value + tol) + 1
+
+
+class _ImzMLMetaDataBrowser(object):
+    def __init__(self, root, sl):
+        self._root = root
+        self._sl = sl
+
+    def for_spectrum(self, i):
+        spectrum = self._root.find(
+            '%srun/%sspectrumList/%sspectrum[@index="%s"]' % tuple(3 * [self._sl] + [i]))
+        return _SpectrumMetaDataBrowser(self._root, self._sl, spectrum)
+
+
+class _SpectrumMetaDataBrowser(object):
+    def __init__(self, root, sl, spectrum):
+        self._root = root
+        self._sl = sl
+        self._spectrum = spectrum
+
+    def get_ids(self, element):
+        param_methods = {
+            param_group_elname: self._find_referenceable_param_groups,
+            data_processing_elname: self._find_data_processing,
+            instrument_confid_elname: self._find_instrument_configurations,
+        }
+        try:
+            return param_methods[element]()
+        except KeyError as e:
+            raise ValueError("Unsupported element: " + str(element))
+
+    def _find_referenceable_param_groups(self):
+        param_group_refs = self._spectrum.findall("%sreferenceableParamGroupRef" % self._sl)
+        ids = map(lambda g: g.attrib["ref"], param_group_refs)
+        return ids
+
+    def _find_instrument_configurations(self):
+        ids = None
+        scan_list = self._spectrum.find("%sscanList" % self._sl)
+        if scan_list:
+            scans = scan_list.findall("%sscan[@instrumentConfigurationRef]" % self._sl)
+            ids = map(lambda s: s.attrib["instrumentConfigurationRef"], scans)
+        if not ids:
+            run = self._root.find("%srun")
+            try:
+                return [run.attrib["defaultInstrumentConfigurationRef"]]
+            except KeyError as _:
+                return list()
+        else:
+            return ids
+
+    def _find_data_processing(self):
+        try:
+            return self._spectrum.attrib["dataProcessingRef"]
+        except KeyError as _:
+            spectrum_list = self._root.find("%srun/%sspectrumList" % tuple(2 * [self._sl]))
+            try:
+                return [spectrum_list.attrib["defaultDataProcessingRef"]]
+            except KeyError as _:
+                return []
