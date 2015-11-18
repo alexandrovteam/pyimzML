@@ -89,3 +89,31 @@ matrix that can be displayed as an image by ``matplotlib``
     plt.imshow(im).set_interpolation('nearest')
     plt.colorbar()
     plt.show()
+
+**Metadata**
+
+*pyimzML* has limited support for the metadata embedded in the imzML file. For some general metadata, you can use
+the parser's ``ìmzmldict`` attribute. You can find the exact list of supported metadata in the documentation of the
+``readimzmlmeta`` method.
+
+Furthermore, *pyimzML* offers some per-spectrum metadata through its ``browse`` function. Follow the example below:
+
+.. code-block:: python
+
+    # get a list of the instrument configurations used in the first pixel
+    instrument_configurations = browse(p).for_spectrum(0).get_ids("instrumentConfiguration")
+
+This is a list of ids with which you can find the corresponding ``<instrumentConfiguration>`` tag in the xml tree.
+Currently, ``instrumentConfiguration``, ``dataProcessing`` and ``referenceableParamGroup`` are supported.
+
+.. code-block:: python
+
+    # use the ids to find the instrumentConfiguration elements in the ElementTree and get their cvParams
+    cv_params = []
+    for ref in instrument_configurations:
+        # find the corresponding instrumentConfiguration element
+        config = p.root.find('%sinstrumentConfigurationList/%sinstrumentConfiguration[@id="%s"]' % (p.sl, p.sl, ref))
+        # get its cvParams
+        cv_params += [param.attrib for param in config.findall("%scvParam" % p.sl)]
+    print cv_params
+
