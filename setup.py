@@ -12,7 +12,7 @@ Outputs data as python lists and dicts.
 All Python versions from 2.7 on are supported, but Python 3.3 or newer is
 recommended for performance reasons.""",
     # The project's main homepage.
-    url='https://github.com/pyIMS/pyimzML',
+    url='https://github.com/alexandrovteam/pyimzML',
     author='Dominik Fay',
     author_email='dominik.fay@embl.de',
 
