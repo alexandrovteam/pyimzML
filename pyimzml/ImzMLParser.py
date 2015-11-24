@@ -17,12 +17,12 @@
 from bisect import bisect_left
 
 try:
-    from lxml.etree import ElementTree
+    from lxml.etree import parse
 except ImportError:
     try:
-        from xml.etree import cElementTree as ElementTree
+        from xml.etree.cElementTree import parse
     except ImportError:
-        from xml.etree import ElementTree
+        from xml.etree.ElementTree import parse
 import mmap
 import struct
 from warnings import warn
@@ -70,7 +70,7 @@ class ImzMLParser:
         self.intensityLengths = []
         # list of all (x,y) or (x,y,z) coordinates as tuples.
         self.coordinates = []
-        self.root = ElementTree.parse(filename).getroot()
+        self.root = parse(filename).getroot()
         # name of the binary file
         bin_filename = self.filename[:-5] + "ibd"
         f = open(bin_filename, "rb")
