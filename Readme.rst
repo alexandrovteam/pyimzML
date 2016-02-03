@@ -103,6 +103,16 @@ Furthermore, *pyimzML* offers some per-spectrum metadata through its ``browse`` 
     # get a list of the instrument configurations used in the first pixel
     instrument_configurations = browse(p).for_spectrum(0).get_ids("instrumentConfiguration")
 
+For browsing all spectra iteratively, you should by all means use **ascending** indices. Doing otherwise can result
+in quadratic runtime. The following example shows how to retrieve all unique instrumentConfigurations used:
+
+.. code-block:: python
+
+    browser = browse(p)
+    all_config_ids = set()
+    for i, _ in enumerate(p.coordinates):
+        all_config_ids.update(browser.for_spectrum(i).get_ids("instrumentConfiguration"))
+
 This is a list of ids with which you can find the corresponding ``<instrumentConfiguration>`` tag in the xml tree.
 Currently, ``instrumentConfiguration``, ``dataProcessing`` and ``referenceableParamGroup`` are supported.
 
