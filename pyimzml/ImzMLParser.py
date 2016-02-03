@@ -17,12 +17,12 @@
 from bisect import bisect_left
 
 try:
-    from lxml.etree import parse
+    from lxml.etree import iterparse
 except ImportError:
     try:
-        from xml.etree.cElementTree import parse
+        from xml.etree.cElementTree import iterparse
     except ImportError:
-        from xml.etree.ElementTree import parse
+        from xml.etree.ElementTree import iterparse
 import mmap
 import struct
 from warnings import warn
@@ -70,7 +70,9 @@ class ImzMLParser:
         self.intensityLengths = []
         # list of all (x,y) or (x,y,z) coordinates as tuples.
         self.coordinates = []
-        self.root = parse(filename).getroot()
+        self.root = None
+        self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
+        self.iter_read_spectrum_meta()
         # name of the binary file
         bin_filename = self.filename[:-5] + "ibd"
         f = open(bin_filename, "rb")
@@ -81,8 +83,6 @@ class ImzMLParser:
         except EnvironmentError:
             print ("Memory mapping failed. Using regular file pointer")
             self.m = f
-        self.mzPrecision, self.intensityPrecision = self.readformats()
-        self.readspectrummeta()
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method readimzmlmeta()
         self.imzmldict = self.readimzmlmeta()
@@ -95,41 +95,52 @@ class ImzMLParser:
     def __exit__(self, exc_t, exc_v, trace):
         self.m.close()
 
-    def readformats(self):
-        """
-        This method should only be called by __init__.
-        Reads the number formatting strings from the xml tree stored in the name
-        attribute of cvParams with accession values "MS:1000521", "MS:1000523",
-        "IMS:1000141" or "IMS:1000142". The string values are "32-bit float",
-        "64-bit float", "32-bit integer", "64-bit integer".
-
-        Output:
-
-        mz_precision:
-            number format for mz array as string specified above
-        intensity_precision:
-            number format for intensity array as string specified above
-
-        :rtype: Tuple[str, str]
-        :raises RuntimeError:
-            if the format string could not be found.
-        """
+    def iter_read_spectrum_meta(self):
         valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
+        mz_group = int_group = mz_precision = int_precision = None
 
-        param_group_list = self.root.find('%sreferenceableParamGroupList' % self.sl)
-        param_groups = param_group_list.findall('%sreferenceableParamGroup' % self.sl)
-        mz_group = None
-        int_group = None
-        mz_precision = None
-        int_precision = None
-        for group in param_groups:
-            for param in group:
-                if param.attrib["name"] == "m/z array":
-                    mz_group = group
-                    self.mzGroupId = group.attrib["id"]
-                elif param.attrib["name"] == "intensity array":
-                    int_group = group
-                    self.intGroupId = group.attrib["id"]
+        elem_iterator = iterparse(self.filename, events=("start", "end"))
+        _, self.root = elem_iterator.next()
+        for event, elem in elem_iterator:
+            if elem.tag == self.sl + "spectrumList" and event == "end":
+                elem.clear()
+            elif elem.tag == self.sl + "spectrum" and event == "end":
+                arrlistelem = elem.find('%sbinaryDataArrayList' % self.sl)
+                elist = list(arrlistelem)
+                elist_sorted = [None, None]
+                for e in elist:
+                    ref = e.find('%sreferenceableParamGroupRef' % self.sl).attrib["ref"]
+                    if ref == self.mzGroupId:
+                        elist_sorted[0] = e
+                    elif ref == self.intGroupId:
+                        elist_sorted[1] = e
+                mz_offset_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
+                self.mzOffsets.append(int(mz_offset_elem.attrib["value"]))
+                mz_length_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
+                self.mzLengths.append(int(mz_length_elem.attrib["value"]))
+                intensity_offset_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
+                self.intensityOffsets.append(int(intensity_offset_elem.attrib["value"]))
+                intensity_length_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
+                self.intensityLengths.append(int(intensity_length_elem.attrib["value"]))
+
+                scan_elem = elem.find('%sscanList/%sscan' % (self.sl, self.sl))
+                x = scan_elem.find('%scvParam[@accession="IMS:1000050"]' % self.sl).attrib["value"]
+                y = scan_elem.find('%scvParam[@accession="IMS:1000051"]' % self.sl).attrib["value"]
+                try:
+                    z = scan_elem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
+                    self.coordinates.append((int(x), int(y), int(z)))
+                except AttributeError:
+                    self.coordinates.append((int(x), int(y)))
+                elem.clear()
+            elif elem.tag == self.sl + "referenceableParamGroup" and event == "end":
+                for param in elem:
+                    if param.attrib["name"] == "m/z array":
+                        self.mzGroupId = elem.attrib['id']
+                        mz_group = elem
+                    elif param.attrib["name"] == "intensity array":
+                        self.intGroupId = elem.attrib['id']
+                        int_group = elem
+
         for s in valid_accession_strings:
             param = mz_group.find('%scvParam[@accession="%s"]' % (self.sl, s))
             if param is not None:
@@ -142,43 +153,7 @@ class ImzMLParser:
                 break
         if (mz_precision is None) or (int_precision is None):
             raise RuntimeError("Unsupported number format: mz = %s, int = %s" % (mz_precision, int_precision))
-        return mz_precision, int_precision
-
-    def readspectrummeta(self):
-        """
-        This method should only be called by __init__.
-        Initializes the attributes mzOffsets, mzLengths, intensityOffsets,
-        coordinates and intensityLenghts with their respective values read from the xml tree.
-        """
-        runelem = self.root.find('%srun' % self.sl)
-        speclistelem = runelem.find('%sspectrumList' % self.sl)
-        for spectrumElem in list(speclistelem):
-            arrlistelem = spectrumElem.find('%sbinaryDataArrayList' % self.sl)
-            elist = list(arrlistelem)
-            elist_sorted = [None, None]
-            for e in elist:
-                ref = e.find('%sreferenceableParamGroupRef' % self.sl).attrib["ref"]
-                if ref == self.mzGroupId:
-                    elist_sorted[0] = e
-                elif ref == self.intGroupId:
-                    elist_sorted[1] = e
-            mz_offset_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
-            self.mzOffsets.append(int(mz_offset_elem.attrib["value"]))
-            mz_length_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
-            self.mzLengths.append(int(mz_length_elem.attrib["value"]))
-            intensity_offset_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
-            self.intensityOffsets.append(int(intensity_offset_elem.attrib["value"]))
-            intensity_length_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
-            self.intensityLengths.append(int(intensity_length_elem.attrib["value"]))
-
-            scan_elem = spectrumElem.find('%sscanList/%sscan' % (self.sl, self.sl))
-            x = scan_elem.find('%scvParam[@accession="IMS:1000050"]' % self.sl).attrib["value"]
-            y = scan_elem.find('%scvParam[@accession="IMS:1000051"]' % self.sl).attrib["value"]
-            try:
-                z = scan_elem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
-                self.coordinates.append((int(x), int(y), int(z)))
-            except AttributeError:
-                self.coordinates.append((int(x), int(y)))
+        self.mzPrecision, self.intensityPrecision = mz_precision, int_precision
 
     def readimzmlmeta(self):
         """
