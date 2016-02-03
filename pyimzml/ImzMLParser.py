@@ -104,13 +104,15 @@ class ImzMLParser:
         "IMS:1000142". The string values are "32-bit float", "64-bit float", "32-bit integer", "64-bit integer".
         """
         mz_group = int_group = None
+        slist = None
         elem_iterator = iterparse(self.filename, events=("start", "end"))
         _, self.root = elem_iterator.next()
         for event, elem in elem_iterator:
-            if elem.tag == self.sl + "spectrumList" and event == "end":
-                elem.clear()
+            if elem.tag == self.sl + "spectrumList" and event == "start":
+                slist = elem
             elif elem.tag == self.sl + "spectrum" and event == "end":
                 self.__process_spectrum(elem)
+                slist.remove(elem)
             elif elem.tag == self.sl + "referenceableParamGroup" and event == "end":
                 for param in elem:
                     if param.attrib["name"] == "m/z array":
@@ -164,7 +166,6 @@ class ImzMLParser:
             self.coordinates.append((int(x), int(y), int(z)))
         except AttributeError:
             self.coordinates.append((int(x), int(y)))
-        elem.clear()
 
     def __readimzmlmeta(self):
         """
@@ -340,7 +341,7 @@ def browse(p):
     :param p: the parser
     :return: the browser
     """
-    return _ImzMLMetaDataBrowser(p.root, p.sl)
+    return _ImzMLMetaDataBrowser(p.root, p.filename, p.sl)
 
 
 def _bisect_spectrum(mzs, mz_value, tol):
@@ -348,14 +349,23 @@ def _bisect_spectrum(mzs, mz_value, tol):
 
 
 class _ImzMLMetaDataBrowser(object):
-    def __init__(self, root, sl):
+    def __init__(self, root, fn, sl):
         self._root = root
         self._sl = sl
+        self._fn = fn
+        self._iter, self._previous, self._list_elem = None, None, None
 
     def for_spectrum(self, i):
-        spectrum = self._root.find(
-            '%srun/%sspectrumList/%sspectrum[@index="%s"]' % tuple(3 * [self._sl] + [i]))
-        return _SpectrumMetaDataBrowser(self._root, self._sl, spectrum)
+        if self._previous is None or i <= self._previous:
+            self._iter = iterparse(self._fn, events=("start", "end"))
+        for event, s in self._iter:
+            if s.tag == self._sl + "spectrumList" and event == "start":
+                self._list_elem = s
+            elif s.tag == self._sl + "spectrum" and event == "end":
+                self._list_elem.remove(s)
+                if s.attrib["index"] == str(i):
+                    self._previous = i
+                    return _SpectrumMetaDataBrowser(self._root, self._sl, s)
 
 
 class _SpectrumMetaDataBrowser(object):
