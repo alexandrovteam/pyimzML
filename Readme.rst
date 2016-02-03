@@ -94,7 +94,7 @@ matrix that can be displayed as an image by ``matplotlib``
 
 *pyimzML* has limited support for the metadata embedded in the imzML file. For some general metadata, you can use
 the parser's ``ìmzmldict`` attribute. You can find the exact list of supported metadata in the documentation of the
-``readimzmlmeta`` method.
+``__readimzmlmeta`` method.
 
 Furthermore, *pyimzML* offers some per-spectrum metadata through its ``browse`` function. Follow the example below:
 

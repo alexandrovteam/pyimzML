@@ -38,11 +38,10 @@ class ImzMLParser:
     Parser for imzML 1.1.0 files (see specification here:
     http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf).
 
-    Reads the .imzML file into memory once and entirely during initialization and
-    returns a spectrum upon calling getspectrum(i). The binary file is read in
-    every call of getspectrum(i). Use enumerate(parser.coordinates) to get all
-    coordinates with their respective index. Relevant meta data is stored in
-    parser.imzmldict
+    Iteratively reads the .imzML file into memory while pruning the per-spectrum metadata (everything in
+    <spectrumList> elements) during initialization. Returns a spectrum upon calling getspectrum(i). The binary file
+    is read in every call of getspectrum(i). Use enumerate(parser.coordinates) to get all coordinates with their
+    respective index. Relevant meta data is stored in parser.imzmldict
     """
 
     def __init__(self, filename):
@@ -72,7 +71,7 @@ class ImzMLParser:
         self.coordinates = []
         self.root = None
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
-        self.iter_read_spectrum_meta()
+        self.__iter_read_spectrum_meta()
         # name of the binary file
         bin_filename = self.filename[:-5] + "ibd"
         f = open(bin_filename, "rb")
@@ -84,8 +83,8 @@ class ImzMLParser:
             print ("Memory mapping failed. Using regular file pointer")
             self.m = f
         # Dict for basic imzML metadata other than those required for reading
-        # spectra. See method readimzmlmeta()
-        self.imzmldict = self.readimzmlmeta()
+        # spectra. See method __readimzmlmeta()
+        self.imzmldict = self.__readimzmlmeta()
 
     # system method for use of 'with ... as'
     def __enter__(self):
@@ -95,7 +94,15 @@ class ImzMLParser:
     def __exit__(self, exc_t, exc_v, trace):
         self.m.close()
 
-    def iter_read_spectrum_meta(self):
+    def __iter_read_spectrum_meta(self):
+        """
+        This method should only be called by __init__. Reads the data formats, coordinates and offsets from
+        the .imzML file and Initializes the respective attributes. While traversing the XML tree, the per-spectrum
+        metadata is pruned, i.e. the <spectrumList> element(s) are left behind empty.
+
+        Supported accession values for the number formats: "MS:1000521", "MS:1000523", "IMS:1000141" or
+        "IMS:1000142". The string values are "32-bit float", "64-bit float", "32-bit integer", "64-bit integer".
+        """
         valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
         mz_group = int_group = mz_precision = int_precision = None
 
@@ -155,7 +162,7 @@ class ImzMLParser:
             raise RuntimeError("Unsupported number format: mz = %s, int = %s" % (mz_precision, int_precision))
         self.mzPrecision, self.intensityPrecision = mz_precision, int_precision
 
-    def readimzmlmeta(self):
+    def __readimzmlmeta(self):
         """
         This method should only be called by __init__. Initializes the imzmldict with frequently used metadata from
         the .imzML file.
