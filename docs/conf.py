@@ -20,8 +20,8 @@ import sphinx_rtd_theme
 sys.path.append('.')
 sys.path.append('..')
 
-import rtd_gen_docs
-from pyimzml import __version__
+import rtd_gen_docs  # noqa
+from pyimzml import __version__  # noqa
 
 rtd_gen_docs.main()
 
