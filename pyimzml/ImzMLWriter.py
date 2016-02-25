@@ -4,6 +4,7 @@ import os
 import numpy as np
 import uuid
 import hashlib
+import sys, getopt
 
 from wheezy.template.engine import Engine
 from wheezy.template.ext.core import CoreExtension
@@ -133,7 +134,6 @@ class ImzMLWriter(object):
         uuid = '{' + self.uuid.urn.split(':')[-1].upper() + '}'
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
-    
         self.xml.write(self.imzml_template.render(locals()))
 
     def addSpectrum(self, mzs, intensities, coords):
@@ -176,19 +176,37 @@ class ImzMLWriter(object):
             self.ibd.close()
             self.xml.close()
 
-def main():
-    import sys
-    sys.path.append("/home/lomereiter/github/PyImzML")
+def main(argv):
     from pyimzml.ImzMLParser import ImzMLParser
-    imzml = ImzMLParser("/home/lomereiter/Downloads/S042_Processed.imzML")
+    inputfile = ''
+    outputfile = ''
+    try:
+        opts, args = getopt.getopt(argv,"hi:o:",["ifile=","ofile="])
+    except getopt.GetoptError:
+        print 'test.py -i <inputfile> -o <outputfile>'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print 'test.py -i <inputfile> -o <outputfile>'
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            inputfile = arg
+        elif opt in ("-o", "--ofile"):
+            outputfile = arg
+    if inputfile == '':
+        print 'test.py -i <inputfile> -o <outputfile>'
+        raise IOError('input file not specified')
+    if outputfile=='':
+        outputfile=inputfile+'.imzML'
+    imzml = ImzMLParser(inputfile)
     spectra = []
-    with ImzMLWriter("/tmp/test.imzML", mz_dtype=np.float32, intensity_dtype=np.float32) as writer:
+    with ImzMLWriter(outputfile, mz_dtype=np.float32, intensity_dtype=np.float32) as writer:
         for i, coords in enumerate(imzml.coordinates):
             mzs, intensities = imzml.getspectrum(i)
             writer.addSpectrum(mzs, intensities, coords)
             spectra.append((mzs, intensities, coords))
 
-    imzml = ImzMLParser("/tmp/test.imzML")
+    imzml = ImzMLParser(outputfile)
     spectra2 = []
     for i, coords in enumerate(imzml.coordinates):
         mzs, intensities = imzml.getspectrum(i)
@@ -197,4 +215,4 @@ def main():
     print spectra[0] == spectra2[0]
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
