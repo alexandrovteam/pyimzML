@@ -1,4 +1,4 @@
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 
 # Copyright 2015 Dominik Fay
 #
@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from bisect import bisect_left
+import sys
 
 try:
     from lxml.etree import iterparse
@@ -23,7 +24,6 @@ except ImportError:
         from xml.etree.cElementTree import iterparse
     except ImportError:
         from xml.etree.ElementTree import iterparse
-import mmap
 import struct
 from warnings import warn
 import numpy as np
@@ -74,14 +74,8 @@ class ImzMLParser:
         self.__iter_read_spectrum_meta()
         # name of the binary file
         bin_filename = self.filename[:-5] + "ibd"
-        f = open(bin_filename, "rb")
-        # try memory mapping if possible
-        try:
-            self.m = mmap.mmap(f.fileno(), mapsize, access=mmap.ACCESS_READ)
-        # if mmap failed to map file to memory
-        except EnvironmentError:
-            print ("Memory mapping failed. Using regular file pointer")
-            self.m = f
+        self.m = open(bin_filename, "rb")
+
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method __readimzmlmeta()
         self.imzmldict = self.__readimzmlmeta()
@@ -106,7 +100,12 @@ class ImzMLParser:
         mz_group = int_group = None
         slist = None
         elem_iterator = iterparse(self.filename, events=("start", "end"))
-        _, self.root = elem_iterator.next()
+
+        if sys.version_info > (3,):
+            _, self.root = next(elem_iterator)
+        else:
+            _, self.root = elem_iterator.next()
+
         for event, elem in elem_iterator:
             if elem.tag == self.sl + "spectrumList" and event == "start":
                 slist = elem
