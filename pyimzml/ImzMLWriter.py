@@ -137,6 +137,8 @@ class ImzMLWriter(object):
         self.xml.write(self.imzml_template.render(locals()))
 
     def addSpectrum(self, mzs, intensities, coords):
+		'''"mzs" and "intensities" are list-like and the same length (parallel arrays)
+		"coords" is a 2-tuple of x and y position OR a 3-tuple of x, y, and z position'''
         mzs, intensities = np.asarray(mzs, dtype=self.mz_dtype), np.asarray(intensities, dtype=self.intensity_dtype)
 
         mz_offset = self.ibd_offset
