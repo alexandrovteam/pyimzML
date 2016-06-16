@@ -20,11 +20,7 @@ IMZML_TEMPLATE = """\
   <fileDescription>
     <fileContent>
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
-      @if mode == "processed":
-      <cvParam cvRef="IMS" accession="IMS:1000031" name="processed" value=""/>
-      @else:
-      <cvParam cvRef="IMS" accession="IMS:1000030" name="continuous" value=""/>
-      @end
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[mode]" name="@mode" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="@uuid"/>
       <cvParam cvRef="IMS" accession="IMS:1000091" name="ibd SHA-1" value="@sha1sum"/>
     </fileContent>
@@ -138,7 +134,8 @@ class ImzMLWriter(object):
         int_data_type = "%d-bit float" % (np.dtype(self.intensity_dtype).itemsize * 8)
         obo_codes = {"16-bit float": "1000520",
             "32-bit integer": "1000519", "32-bit float": "1000521",
-            "64-bit integer": "1000522", "64-bit float": "1000523"}
+            "64-bit integer": "1000522", "64-bit float": "1000523",
+            "continuous": "1000030", "processed": "1000031"}
         uuid = ("{%s}"%self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
