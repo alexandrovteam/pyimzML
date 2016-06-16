@@ -39,5 +39,5 @@ recommended for performance reasons.""",
     packages=['pyimzml'],
 
     setup_requires=['numpy'],
-    install_requires=['numpy'],
+    install_requires=['numpy','wheezy.template'],
 )
