@@ -3,6 +3,7 @@ import numpy as np
 import uuid
 import hashlib
 import sys, getopt
+from collections import namedtuple
 
 from wheezy.template.engine import Engine
 from wheezy.template.ext.core import CoreExtension
@@ -105,16 +106,17 @@ IMZML_TEMPLATE = """\
 
 class ImzMLWriter(object):
     def __init__(self, output_filename, mz_dtype=np.float64, intensity_dtype=np.float32):
-        '''"output_filename" is the base name, two files will be made by adding ".ibd" and ".imzML" to the basename'''
+        '''"output_filename" is the base name, two files will be made by adding ".ibd" and ".imzML" to the base name
+        processed or continuous mode will be chosen automatically. Identical mz lists will only be written once.
+        Force process mode by setting "instance.hashes = None"'''
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
         self.run_id = os.path.splitext(output_filename)[0]
-        self.filename =  self.run_id + ".imzML"
+        self.filename = self.run_id + ".imzML"
         self.ibd_filename = self.run_id + ".ibd"
         self.xml = open(self.filename, 'w')
         self.ibd = open(self.ibd_filename, 'wb')
         self.sha1 = hashlib.sha1()
-        self.ibd_offset = 0
         self.uuid = uuid.uuid4()
 
         self._write_ibd(self.uuid.bytes_le)
@@ -125,13 +127,19 @@ class ImzMLWriter(object):
         self.spectra = []
         self.hashes = {} #set this to None to force processed mode.
 
-        from collections import namedtuple
-        self.Spectrum = namedtuple('Spectrum', ['coords', 'mz_len', 'mz_offset', 'mz_enc_len', 'int_len', 'int_offset', 'int_enc_len'])
+        self.Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len')
 
+    @staticmethod
+    def _np_type_to_name(dtype):
+        if dtype.__name__.startswith('float'):
+            return "%s-bit float"%dtype.__name__[5:]
+        elif dtype.__name__.startswith('int'):
+            return "%s-bit integer"%dtype.__name__[3:]
+            
     def _write_xml(self):
         spectra = self.spectra
-        mz_data_type = "%d-bit float" % (np.dtype(self.mz_dtype).itemsize * 8)
-        int_data_type = "%d-bit float" % (np.dtype(self.intensity_dtype).itemsize * 8)
+        mz_data_type = self._np_type_to_name(self.mz_dtype)
+        int_data_type = self._np_type_to_name(self.intensity_dtype)
         obo_codes = {"16-bit float": "1000520",
             "32-bit integer": "1000519", "32-bit float": "1000521",
             "64-bit integer": "1000522", "64-bit float": "1000523",
@@ -144,7 +152,7 @@ class ImzMLWriter(object):
 
     def _encode_and_write(self, data, dtype=np.float32):
         data = np.asarray(data, dtype=dtype)
-        offset = self.ibd_offset
+        offset = self.ibd.tell()
         return offset, data.shape[0], self._write_ibd(data.tobytes())
             
     def addSpectrum(self, mzs, intensities, coords):
@@ -153,28 +161,25 @@ class ImzMLWriter(object):
         note some applications want coords to be 1-indexed'''
         if self.hashes is not None:
             mz_hash = hash(mzs)
-            if mz_hash in self.hashes:
-                mz_offset, mz_len, mz_enc_len = self.hashes[mz_hash]
-            else:
-                mz_offset, mz_len, mz_enc_len = self._encode_and_write(mzs, dtype=self.mz_dtype)
-                self.hashes[mz_hash] = mz_offset, mz_len, mz_enc_len
+            if mz_hash not in self.hashes:
+                self.hashes[mz_hash] = self._encode_and_write(mzs, dtype=self.mz_dtype)
+            mz_offset, mz_len, mz_enc_len = self.hashes[mz_hash]
         else:
             mz_offset, mz_len, mz_enc_len = self._encode_and_write(mzs, dtype=self.mz_dtype)
             
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype)
 
-        s = self.Spectrum(mz_offset=mz_offset, mz_len=mz_len,
-                          int_offset=int_offset, int_len=int_len, coords=coords,
-                          int_enc_len=int_enc_len, mz_enc_len=mz_enc_len)
-
+        s = self.Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len)
         self.spectra.append(s)
 
     def _write_ibd(self, bytes):
         self.ibd.write(bytes)
         self.sha1.update(bytes)
-        enc_length = len(bytes)
-        self.ibd_offset += enc_length
-        return enc_length
+        return len(bytes)
+
+    def close(self):
+        '''writes the XML file and closes all files'''
+        self.finish()
 
     def finish(self):
         self.ibd.close()
