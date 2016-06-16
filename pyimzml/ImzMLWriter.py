@@ -1,10 +1,8 @@
-
 import os
 import numpy as np
 import uuid
 import hashlib
 import sys, getopt
-import struct
 
 from wheezy.template.engine import Engine
 from wheezy.template.ext.core import CoreExtension
@@ -185,7 +183,6 @@ class ImzMLWriter(object):
         self.ibd.close()
         self._write_xml()
         self.xml.close()
-        print "finished"
 
     def __enter__(self):
         return self
