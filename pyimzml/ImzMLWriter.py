@@ -105,16 +105,37 @@ IMZML_TEMPLATE = """\
 </mzML>
 """
 
+class NoCompression(object):
+    name = "no compression"
+    
+    def rounding(self, data):
+        return data
+    def compress(self, bytes):
+        return bytes
+
+class ZlibCompression(object):
+    name ="zlib compression"
+    
+    def __init__(self, round=None):
+        self.round_amt = round
+        
+    def rounding(self, data):
+        if self.round_amt is not None:
+            return [round(x,self.round_amt) for x in data] #rounding helps the compression, but is lossy
+        return data
+
+    def compress(self, bytes):
+        return zlib.compress(bytes)
+
 class ImzMLWriter(object):
-    def __init__(self, output_filename, mz_dtype=np.float64, intensity_dtype=np.float32, mz_compression=False, intensity_compression=False):
+    def __init__(self, output_filename,
+        mz_dtype=np.float64, intensity_dtype=np.float32,
+        mz_compression=NoCompression(), intensity_compression=NoCompression()):
         '''"output_filename" is used to make the base name by removing the extension (if any).
         two files will be made by adding ".ibd" and ".imzML" to the base name
         processed or continuous mode will be chosen automatically. Identical mz lists will only be written once.
         Force process mode by setting "instance.hashes = None"
-        "compression" must be True or False or indicate a number to round to.
-          eg intensity_compression=2 will round all intensity values to 2 decimal places (12345.6789 => 12345.67)
-          eg intensity_compression=-2 will round all intensity values to the hundreds (12345.6789 => 12300)
-          rounding increases compression but also induces lossy data'''
+        "compression" must be an instance of NoCompression or ZlibCompression'''
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
         self.mz_compression = mz_compression
@@ -156,19 +177,17 @@ class ImzMLWriter(object):
         uuid = ("{%s}"%self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
-        mz_compression = "zlib compression" if self.mz_compression is not False else "no compression"
-        int_compression = "zlib compression" if self.intensity_compression is not False else "no compression"
+        mz_compression = self.mz_compression.name
+        int_compression = self.intensity_compression.name
         mode = "processed" if self.hashes is None or len(self.hashes) != 1 else "continuous"
         self.xml.write(self.imzml_template.render(locals()))
 
-    def _encode_and_write(self, data, dtype=np.float32, compression=False):
-        if not isinstance(compression, bool):
-            data = [round(x,compression) for x in data] #rounding helps the compression, but is lossy
+    def _encode_and_write(self, data, dtype=np.float32, compression=NoCompression()):
+        data = compression.rounding(data)
         data = np.asarray(data, dtype=dtype)
         offset = self.ibd.tell()
         bytes = data.tobytes()
-        if compression is not False:
-            bytes = zlib.compress(bytes)
+        bytes = compression.compress(bytes)
         return offset, data.shape[0], self._write_ibd(bytes)
             
     def addSpectrum(self, mzs, intensities, coords):
@@ -176,7 +195,7 @@ class ImzMLWriter(object):
         "coords" is a 2-tuple of x and y position OR a 3-tuple of x, y, and z position
         note some applications want coords to be 1-indexed'''
         if self.hashes is not None:
-            mz_hash = hash(mzs)
+            mz_hash = "%s-%s-%s"%(hash(mzs), sum(mzs), len(mzs))
             if mz_hash not in self.hashes:
                 self.hashes[mz_hash] = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
             mz_offset, mz_len, mz_enc_len = self.hashes[mz_hash]
