@@ -4,13 +4,14 @@ import uuid
 import hashlib
 import sys, getopt
 from collections import namedtuple
+import zlib
 
 from wheezy.template.engine import Engine
 from wheezy.template.ext.core import CoreExtension
 from wheezy.template.loader import DictLoader
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -31,12 +32,12 @@ IMZML_TEMPLATE = """\
     <referenceableParamGroup id="mzArray">
       <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
       <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_compression]" name="@mz_compression" value=""/>
     </referenceableParamGroup>
     <referenceableParamGroup id="intensityArray">
       <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
       <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
     </referenceableParamGroup>
   </referenceableParamGroupList>
 
@@ -105,12 +106,19 @@ IMZML_TEMPLATE = """\
 """
 
 class ImzMLWriter(object):
-    def __init__(self, output_filename, mz_dtype=np.float64, intensity_dtype=np.float32):
-        '''"output_filename" is the base name, two files will be made by adding ".ibd" and ".imzML" to the base name
+    def __init__(self, output_filename, mz_dtype=np.float64, intensity_dtype=np.float32, mz_compression=False, intensity_compression=False):
+        '''"output_filename" is used to make the base name by removing the extension (if any).
+        two files will be made by adding ".ibd" and ".imzML" to the base name
         processed or continuous mode will be chosen automatically. Identical mz lists will only be written once.
-        Force process mode by setting "instance.hashes = None"'''
+        Force process mode by setting "instance.hashes = None"
+        "compression" must be True or False or indicate a number to round to.
+          eg intensity_compression=2 will round all intensity values to 2 decimal places (12345.6789 => 12345.67)
+          eg intensity_compression=-2 will round all intensity values to the hundreds (12345.6789 => 12300)
+          rounding increases compression but also induces lossy data'''
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
+        self.mz_compression = mz_compression
+        self.intensity_compression = intensity_compression
         self.run_id = os.path.splitext(output_filename)[0]
         self.filename = self.run_id + ".imzML"
         self.ibd_filename = self.run_id + ".ibd"
@@ -143,17 +151,25 @@ class ImzMLWriter(object):
         obo_codes = {"16-bit float": "1000520",
             "32-bit integer": "1000519", "32-bit float": "1000521",
             "64-bit integer": "1000522", "64-bit float": "1000523",
-            "continuous": "1000030", "processed": "1000031"}
+            "continuous": "1000030", "processed": "1000031",
+            "zlib compression": "1000574", "no compression": "1000576"}
         uuid = ("{%s}"%self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
+        mz_compression = "zlib compression" if self.mz_compression is not False else "no compression"
+        int_compression = "zlib compression" if self.intensity_compression is not False else "no compression"
         mode = "processed" if self.hashes is None or len(self.hashes) != 1 else "continuous"
         self.xml.write(self.imzml_template.render(locals()))
 
-    def _encode_and_write(self, data, dtype=np.float32):
+    def _encode_and_write(self, data, dtype=np.float32, compression=False):
+        if not isinstance(compression, bool):
+            data = [round(x,compression) for x in data] #rounding helps the compression, but is lossy
         data = np.asarray(data, dtype=dtype)
         offset = self.ibd.tell()
-        return offset, data.shape[0], self._write_ibd(data.tobytes())
+        bytes = data.tobytes()
+        if compression is not False:
+            bytes = zlib.compress(bytes)
+        return offset, data.shape[0], self._write_ibd(bytes)
             
     def addSpectrum(self, mzs, intensities, coords):
         '''"mzs" and "intensities" are list-like and the same length (parallel arrays)
@@ -162,12 +178,12 @@ class ImzMLWriter(object):
         if self.hashes is not None:
             mz_hash = hash(mzs)
             if mz_hash not in self.hashes:
-                self.hashes[mz_hash] = self._encode_and_write(mzs, dtype=self.mz_dtype)
+                self.hashes[mz_hash] = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
             mz_offset, mz_len, mz_enc_len = self.hashes[mz_hash]
         else:
-            mz_offset, mz_len, mz_enc_len = self._encode_and_write(mzs, dtype=self.mz_dtype)
+            mz_offset, mz_len, mz_enc_len = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
             
-        int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype)
+        int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
 
         s = self.Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len)
         self.spectra.append(s)
@@ -177,7 +193,7 @@ class ImzMLWriter(object):
         self.sha1.update(bytes)
         return len(bytes)
 
-    def close(self):
+    def close(self): #'close' is a more common use for this
         '''writes the XML file and closes all files'''
         self.finish()
 
