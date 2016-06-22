@@ -3,7 +3,7 @@ import numpy as np
 import uuid
 import hashlib
 import sys, getopt
-from collections import namedtuple
+from collections import namedtuple, OrderedDict, defaultdict
 import zlib
 
 from wheezy.template.engine import Engine
@@ -110,14 +110,18 @@ class NoCompression(object):
     
     def rounding(self, data):
         return data
+        
     def compress(self, bytes):
+        return bytes
+        
+    def decompress(self, bytes):
         return bytes
 
 class ZlibCompression(object):
     name ="zlib compression"
     
-    def __init__(self, round=None):
-        self.round_amt = round
+    def __init__(self, round_amt=None):
+        self.round_amt = round_amt
         
     def rounding(self, data):
         if self.round_amt is not None:
@@ -126,25 +130,42 @@ class ZlibCompression(object):
 
     def compress(self, bytes):
         return zlib.compress(bytes)
+        
+    def decompress(self, bytes):
+        return zlib.decompress(bytes)
+
+class MaxlenDict(OrderedDict):
+    def __init__(self, *args, **kwargs):
+        self.maxlen = kwargs.pop('maxlen', None)
+        OrderedDict.__init__(self, *args, **kwargs)
+        
+    def __setitem__(self, key, value):
+        if self.maxlen is not None and len(self) >= self.maxlen:
+            self.popitem(0) #pop oldest
+        OrderedDict.__setitem__(self, key, value)
 
 class ImzMLWriter(object):
     def __init__(self, output_filename,
-        mz_dtype=np.float64, intensity_dtype=np.float32,
+        mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
         mz_compression=NoCompression(), intensity_compression=NoCompression()):
         '''"output_filename" is used to make the base name by removing the extension (if any).
         two files will be made by adding ".ibd" and ".imzML" to the base name
-        processed or continuous mode will be chosen automatically. Identical mz lists will only be written once.
-        Force process mode by setting "instance.hashes = None"
+        
+        "continuous" mode will use the first mz array only
+        "processed" mode write every mz array seperately
+        "auto" mode writes only mz arrays that have not already been written
+        
         "compression" must be an instance of NoCompression or ZlibCompression'''
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
+        self.mode = mode
         self.mz_compression = mz_compression
         self.intensity_compression = intensity_compression
         self.run_id = os.path.splitext(output_filename)[0]
         self.filename = self.run_id + ".imzML"
         self.ibd_filename = self.run_id + ".ibd"
         self.xml = open(self.filename, 'w')
-        self.ibd = open(self.ibd_filename, 'wb')
+        self.ibd = open(self.ibd_filename, 'wb+')
         self.sha1 = hashlib.sha1()
         self.uuid = uuid.uuid4()
 
@@ -154,8 +175,11 @@ class ImzMLWriter(object):
         self.imzml_template = self.wheezy_engine.get_template('imzml')
 
         self.spectra = []
-        self.hashes = {} #set this to None to force processed mode.
-
+        self.first_mz = None
+        self.hashes = defaultdict(list) #mz_hash -> list of mz_data (disk location)
+        self.seen_mzs = MaxlenDict(maxlen=10) #mz_array -> mz_data (disk location)
+        self.seen_mzs = MaxlenDict(maxlen=3) #DEBUG
+        
         self.Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len')
 
     @staticmethod
@@ -179,28 +203,74 @@ class ImzMLWriter(object):
         run_id = self.run_id
         mz_compression = self.mz_compression.name
         int_compression = self.intensity_compression.name
-        mode = "processed" if self.hashes is None or len(self.hashes) != 1 else "continuous"
+        if self.mode == 'auto':
+            mode = "processed" if len(self.seen_mzs) > 1 else "continuous"
+        else:
+            mode = self.mode
         self.xml.write(self.imzml_template.render(locals()))
 
     def _encode_and_write(self, data, dtype=np.float32, compression=NoCompression()):
-        data = compression.rounding(data)
         data = np.asarray(data, dtype=dtype)
         offset = self.ibd.tell()
         bytes = data.tobytes()
         bytes = compression.compress(bytes)
         return offset, data.shape[0], self._write_ibd(bytes)
+
+    def _read_mz(self, mz_offset, mz_len, mz_enc_len):
+        '''reads a mz array from the currently open ibd file'''
+        #~ print "reading from idb" #DEBUG
+        self.ibd.seek(mz_offset)
+        data = self.ibd.read(mz_enc_len)
+        self.ibd.seek(0, 2)
+        data = self.mz_compression.decompress(data)
+        return np.fromstring(data, dtype=self.mz_dtype)
+
+    def _get_previous_mz(self, mzs):
+        '''given an mz array, return the mz_data (disk location)
+        if the mz array was not previously written, write to disk first'''
+        mzs = tuple(mzs) #must be hashable for use in the dictionary
+        if mzs in self.seen_mzs:
+            return self.seen_mzs[mzs]
             
+        #mz not recognized ... check hash
+        mz_hash = "%s-%s-%s"%(hash(mzs), sum(mzs), len(mzs))
+        #~ mz_hash = mzs[0] #DEBUG
+        if mz_hash in self.hashes:
+            for mz_data in self.hashes[mz_hash]:
+                test_mz = tuple(self._read_mz(*mz_data))
+                #~ print test_mz] #DEBUG
+                if mzs == test_mz:
+                    self.seen_mzs[tuple(test_mz)] = mz_data 
+                    return mz_data
+        #hash not recognized
+        #must be a new mz array ... write it, add it to seen mzs and hashes
+        #~ print "no previous mz array found" #DEBUG
+        mz_data = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+        self.hashes[mz_hash].append(mz_data)
+        self.seen_mzs[tuple(mzs)] = mz_data
+        return mz_data
+    
     def addSpectrum(self, mzs, intensities, coords):
         '''"mzs" and "intensities" are list-like and the same length (parallel arrays)
         "coords" is a 2-tuple of x and y position OR a 3-tuple of x, y, and z position
         note some applications want coords to be 1-indexed'''
-        if self.hashes is not None:
-            mz_hash = "%s-%s-%s"%(hash(mzs), sum(mzs), len(mzs))
-            if mz_hash not in self.hashes:
-                self.hashes[mz_hash] = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
-            mz_offset, mz_len, mz_enc_len = self.hashes[mz_hash]
+        #must be rounded now to allow comparisons to later data
+        #but don't waste CPU time in continuous mode since the data will not be used anyway
+        if self.mode != "continuous" or self.first_mz is None:
+            mzs = self.mz_compression.rounding(mzs)
+        intensities = self.intensity_compression.rounding(intensities)
+        
+        if self.mode == "continuous":
+            if self.first_mz is None:
+                self.first_mz = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+            mz_data = self.first_mz
+        elif self.mode == "processed":
+            mz_data = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+        elif self.mode == "auto":
+            mz_data = self._get_previous_mz(mzs)
         else:
-            mz_offset, mz_len, mz_enc_len = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+            raise TypeError, "Unknown mode: %s"%self.mode
+        mz_offset, mz_len, mz_enc_len = mz_data
             
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
 
@@ -208,6 +278,7 @@ class ImzMLWriter(object):
         self.spectra.append(s)
 
     def _write_ibd(self, bytes):
+        #~ print "writing to ibd" #DEBUG
         self.ibd.write(bytes)
         self.sha1.update(bytes)
         return len(bytes)
