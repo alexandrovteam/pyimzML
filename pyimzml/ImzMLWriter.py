@@ -178,7 +178,7 @@ class ImzMLWriter(object):
         self.first_mz = None
         self.hashes = defaultdict(list) #mz_hash -> list of mz_data (disk location)
         self.seen_mzs = MaxlenDict(maxlen=10) #mz_array -> mz_data (disk location)
-        self.seen_mzs = MaxlenDict(maxlen=3) #DEBUG
+        #~ self.seen_mzs = MaxlenDict(maxlen=3) #DEBUG
         
         self.Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len')
 
