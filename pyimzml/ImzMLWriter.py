@@ -1,17 +1,17 @@
-from lxml.objectify import ElementMaker
-import lxml.etree
 import os
 import numpy as np
 import uuid
 import hashlib
 import sys, getopt
+from collections import namedtuple, OrderedDict, defaultdict
+import zlib
 
 from wheezy.template.engine import Engine
 from wheezy.template.ext.core import CoreExtension
 from wheezy.template.loader import DictLoader
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -22,7 +22,7 @@ IMZML_TEMPLATE = """\
   <fileDescription>
     <fileContent>
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
-      <cvParam cvRef="IMS" accession="IMS:1000031" name="processed" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[mode]" name="@mode" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="@uuid"/>
       <cvParam cvRef="IMS" accession="IMS:1000091" name="ibd SHA-1" value="@sha1sum"/>
     </fileContent>
@@ -31,21 +31,22 @@ IMZML_TEMPLATE = """\
   <referenceableParamGroupList count="2">
     <referenceableParamGroup id="mzArray">
       <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
-      <cvParam cvRef="MS" accession="MS:1000523" name="@mz_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_compression]" name="@mz_compression" value=""/>
     </referenceableParamGroup>
     <referenceableParamGroup id="intensityArray">
       <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
-      <cvParam cvRef="MS" accession="MS:1000523" name="@int_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
     </referenceableParamGroup>
   </referenceableParamGroupList>
 
   <softwareList count="1">
     <software id="pyimzml" version="0.0001">
-      <cvParam cvRef="MS" accession="MS:xxx" name="pyimzml" value="pyimzml exporter"/>
+      <cvParam cvRef="MS" accession="MS:1000799" name="custom unreleased software tool" value="pyimzml exporter"/>
     </software>
   </softwareList>
+  
   <scanSettingsList count="1">
     <scanSettings id="scanSettings1">
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="@{(max(s.coords[0] for s in spectra))!!s}"/>
@@ -104,17 +105,68 @@ IMZML_TEMPLATE = """\
 </mzML>
 """
 
+class NoCompression(object):
+    name = "no compression"
+    
+    def rounding(self, data):
+        return data
+        
+    def compress(self, bytes):
+        return bytes
+        
+    def decompress(self, bytes):
+        return bytes
+
+class ZlibCompression(object):
+    name ="zlib compression"
+    
+    def __init__(self, round_amt=None):
+        self.round_amt = round_amt
+        
+    def rounding(self, data):
+        if self.round_amt is not None:
+            return [round(x,self.round_amt) for x in data] #rounding helps the compression, but is lossy
+        return data
+
+    def compress(self, bytes):
+        return zlib.compress(bytes)
+        
+    def decompress(self, bytes):
+        return zlib.decompress(bytes)
+
+class MaxlenDict(OrderedDict):
+    def __init__(self, *args, **kwargs):
+        self.maxlen = kwargs.pop('maxlen', None)
+        OrderedDict.__init__(self, *args, **kwargs)
+        
+    def __setitem__(self, key, value):
+        if self.maxlen is not None and len(self) >= self.maxlen:
+            self.popitem(0) #pop oldest
+        OrderedDict.__setitem__(self, key, value)
+
 class ImzMLWriter(object):
-    def __init__(self, output_filename, mz_dtype=np.float64, intensity_dtype=np.float32):
+    def __init__(self, output_filename,
+        mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
+        mz_compression=NoCompression(), intensity_compression=NoCompression()):
+        '''"output_filename" is used to make the base name by removing the extension (if any).
+        two files will be made by adding ".ibd" and ".imzML" to the base name
+        
+        "continuous" mode will use the first mz array only
+        "processed" mode write every mz array seperately
+        "auto" mode writes only mz arrays that have not already been written
+        
+        "compression" must be an instance of NoCompression or ZlibCompression'''
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
+        self.mode = mode
+        self.mz_compression = mz_compression
+        self.intensity_compression = intensity_compression
         self.run_id = os.path.splitext(output_filename)[0]
-        self.filename =  self.run_id + ".imzML"
+        self.filename = self.run_id + ".imzML"
         self.ibd_filename = self.run_id + ".ibd"
         self.xml = open(self.filename, 'w')
-        self.ibd = open(self.ibd_filename, 'w')
+        self.ibd = open(self.ibd_filename, 'wb+')
         self.sha1 = hashlib.sha1()
-        self.ibd_offset = 0
         self.uuid = uuid.uuid4()
 
         self._write_ibd(self.uuid.bytes_le)
@@ -123,43 +175,117 @@ class ImzMLWriter(object):
         self.imzml_template = self.wheezy_engine.get_template('imzml')
 
         self.spectra = []
+        self.first_mz = None
+        self.hashes = defaultdict(list) #mz_hash -> list of mz_data (disk location)
+        self.seen_mzs = MaxlenDict(maxlen=10) #mz_array -> mz_data (disk location)
+        #~ self.seen_mzs = MaxlenDict(maxlen=3) #DEBUG
+        
+        self.Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len')
 
-        from collections import namedtuple
-        self.Spectrum = namedtuple('Spectrum', ['coords', 'mz_len', 'mz_offset', 'mz_enc_len', 'int_len', 'int_offset', 'int_enc_len'])
-
+    @staticmethod
+    def _np_type_to_name(dtype):
+        if dtype.__name__.startswith('float'):
+            return "%s-bit float"%dtype.__name__[5:]
+        elif dtype.__name__.startswith('int'):
+            return "%s-bit integer"%dtype.__name__[3:]
+            
     def _write_xml(self):
         spectra = self.spectra
-        mz_data_type = "%d-bit float" % (np.dtype(self.mz_dtype).itemsize * 8)
-        int_data_type = "%d-bit float" % (np.dtype(self.intensity_dtype).itemsize * 8)
-        uuid = '{' + self.uuid.urn.split(':')[-1].upper() + '}'
+        mz_data_type = self._np_type_to_name(self.mz_dtype)
+        int_data_type = self._np_type_to_name(self.intensity_dtype)
+        obo_codes = {"16-bit float": "1000520",
+            "32-bit integer": "1000519", "32-bit float": "1000521",
+            "64-bit integer": "1000522", "64-bit float": "1000523",
+            "continuous": "1000030", "processed": "1000031",
+            "zlib compression": "1000574", "no compression": "1000576"}
+        uuid = ("{%s}"%self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
+        mz_compression = self.mz_compression.name
+        int_compression = self.intensity_compression.name
+        if self.mode == 'auto':
+            mode = "processed" if len(self.seen_mzs) > 1 else "continuous"
+        else:
+            mode = self.mode
         self.xml.write(self.imzml_template.render(locals()))
 
+    def _encode_and_write(self, data, dtype=np.float32, compression=NoCompression()):
+        data = np.asarray(data, dtype=dtype)
+        offset = self.ibd.tell()
+        bytes = data.tobytes()
+        bytes = compression.compress(bytes)
+        return offset, data.shape[0], self._write_ibd(bytes)
+
+    def _read_mz(self, mz_offset, mz_len, mz_enc_len):
+        '''reads a mz array from the currently open ibd file'''
+        #~ print "reading from idb" #DEBUG
+        self.ibd.seek(mz_offset)
+        data = self.ibd.read(mz_enc_len)
+        self.ibd.seek(0, 2)
+        data = self.mz_compression.decompress(data)
+        return np.fromstring(data, dtype=self.mz_dtype)
+
+    def _get_previous_mz(self, mzs):
+        '''given an mz array, return the mz_data (disk location)
+        if the mz array was not previously written, write to disk first'''
+        mzs = tuple(mzs) #must be hashable for use in the dictionary
+        if mzs in self.seen_mzs:
+            return self.seen_mzs[mzs]
+            
+        #mz not recognized ... check hash
+        mz_hash = "%s-%s-%s"%(hash(mzs), sum(mzs), len(mzs))
+        #~ mz_hash = mzs[0] #DEBUG
+        if mz_hash in self.hashes:
+            for mz_data in self.hashes[mz_hash]:
+                test_mz = tuple(self._read_mz(*mz_data))
+                #~ print test_mz] #DEBUG
+                if mzs == test_mz:
+                    self.seen_mzs[tuple(test_mz)] = mz_data 
+                    return mz_data
+        #hash not recognized
+        #must be a new mz array ... write it, add it to seen mzs and hashes
+        #~ print "no previous mz array found" #DEBUG
+        mz_data = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+        self.hashes[mz_hash].append(mz_data)
+        self.seen_mzs[tuple(mzs)] = mz_data
+        return mz_data
+    
     def addSpectrum(self, mzs, intensities, coords):
-        mzs, intensities = np.asarray(mzs, dtype=self.mz_dtype), np.asarray(intensities, dtype=self.intensity_dtype)
+        '''"mzs" and "intensities" are list-like and the same length (parallel arrays)
+        "coords" is a 2-tuple of x and y position OR a 3-tuple of x, y, and z position
+        note some applications want coords to be 1-indexed'''
+        #must be rounded now to allow comparisons to later data
+        #but don't waste CPU time in continuous mode since the data will not be used anyway
+        if self.mode != "continuous" or self.first_mz is None:
+            mzs = self.mz_compression.rounding(mzs)
+        intensities = self.intensity_compression.rounding(intensities)
+        
+        if self.mode == "continuous":
+            if self.first_mz is None:
+                self.first_mz = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+            mz_data = self.first_mz
+        elif self.mode == "processed":
+            mz_data = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
+        elif self.mode == "auto":
+            mz_data = self._get_previous_mz(mzs)
+        else:
+            raise TypeError, "Unknown mode: %s"%self.mode
+        mz_offset, mz_len, mz_enc_len = mz_data
+            
+        int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
 
-        mz_offset = self.ibd_offset
-        mz_len = mzs.shape[0]
-        mzs_bytes = mzs.tobytes()
-        self._write_ibd(mzs_bytes)
-        int_offset = self.ibd_offset
-        mz_enc_len = int_offset - mz_offset
-        int_len = intensities.shape[0]
-        intensities_bytes = intensities.tobytes()
-        self._write_ibd(intensities_bytes)
-        int_enc_len = self.ibd_offset - int_offset
-
-        s = self.Spectrum(mz_offset=mz_offset, mz_len=mz_len,
-                          int_offset=int_offset, int_len=int_len, coords=coords,
-                          int_enc_len=int_enc_len, mz_enc_len=mz_enc_len)
-
+        s = self.Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len)
         self.spectra.append(s)
 
     def _write_ibd(self, bytes):
+        #~ print "writing to ibd" #DEBUG
         self.ibd.write(bytes)
         self.sha1.update(bytes)
-        self.ibd_offset += len(bytes)
+        return len(bytes)
+
+    def close(self): #'close' is a more common use for this
+        '''writes the XML file and closes all files'''
+        self.finish()
 
     def finish(self):
         self.ibd.close()
