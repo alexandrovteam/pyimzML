@@ -1,9 +1,9 @@
-
+from pyimzml import __version__
 from setuptools import setup
 
 setup(
     name='pyimzML',
-    version=u'1.1.2',
+    version=__version__,
     description="Parser for conversion of imzML 1.1.0 files",
     long_description="""
 Parser for conversion of imzML 1.1.0 files.
@@ -38,6 +38,5 @@ recommended for performance reasons.""",
     # packages=find_packages(),
     packages=['pyimzml'],
 
-    #~ setup_requires=['numpy','wheezy.template'],
     install_requires=['numpy','wheezy.template'],
 )

@@ -293,6 +293,9 @@ class ImzMLParser:
         intensity_string = self.m.read(lengths[1])
         return mz_string, intensity_string
 
+    def getionimage(self, mz_value, tol=0.1, z=None, reduce_func=sum):
+        getionimage(self, mz_value, tol, z, reduce_func)
+
 
 def getionimage(p, mz_value, tol=0.1, z=None, reduce_func=sum):
     """
