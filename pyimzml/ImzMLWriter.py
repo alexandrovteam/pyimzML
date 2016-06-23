@@ -6,9 +6,7 @@ import sys
 import getopt
 from collections import namedtuple, OrderedDict, defaultdict
 
-from wheezy.template.engine import Engine
-from wheezy.template.ext.core import CoreExtension
-from wheezy.template.loader import DictLoader
+from wheezy.template import Engine, CoreExtension, DictLoader
 
 from pyimzml.compression import NoCompression, ZlibCompression
 
@@ -267,7 +265,7 @@ class ImzMLWriter(object):
         elif self.mode == "auto":
             mz_data = self._get_previous_mz(mzs)
         else:
-            raise TypeError, "Unknown mode: %s"%self.mode
+            raise TypeError("Unknown mode: %s"%self.mode)
         mz_offset, mz_len, mz_enc_len = mz_data
             
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
@@ -301,18 +299,18 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv,"hi:o:",["ifile=","ofile="])
     except getopt.GetoptError:
-        print 'test.py -i <inputfile> -o <outputfile>'
+        print('test.py -i <inputfile> -o <outputfile>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test.py -i <inputfile> -o <outputfile>'
+            print('test.py -i <inputfile> -o <outputfile>')
             sys.exit()
         elif opt in ("-i", "--ifile"):
             inputfile = arg
         elif opt in ("-o", "--ofile"):
             outputfile = arg
     if inputfile == '':
-        print 'test.py -i <inputfile> -o <outputfile>'
+        print('test.py -i <inputfile> -o <outputfile>')
         raise IOError('input file not specified')
     if outputfile=='':
         outputfile=inputfile+'.imzML'
@@ -330,7 +328,7 @@ def main(argv):
         mzs, intensities = imzml.getspectrum(i)
         spectra2.append((mzs, intensities, coords))
 
-    print spectra[0] == spectra2[0]
+    print(spectra[0] == spectra2[0])
 
 if __name__ == '__main__':
     main(sys.argv[1:])
