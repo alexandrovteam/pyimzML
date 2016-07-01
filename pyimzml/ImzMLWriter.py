@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import numpy as np
 import uuid
@@ -46,14 +48,14 @@ IMZML_TEMPLATE = """\
       <cvParam cvRef="MS" accession="MS:1000799" name="custom unreleased software tool" value="pyimzml exporter"/>
     </software>
   </softwareList>
-  
+
   <scanSettingsList count="1">
     <scanSettings id="scanSettings1">
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="@{(max(s.coords[0] for s in spectra))!!s}"/>
       <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="@{(max(s.coords[1] for s in spectra))!!s}"/>
     </scanSettings>
   </scanSettingsList>
-  
+
   <instrumentConfigurationList count="1">
     <instrumentConfiguration id="IC1">
     </instrumentConfiguration>
@@ -109,7 +111,7 @@ class MaxlenDict(OrderedDict):
     def __init__(self, *args, **kwargs):
         self.maxlen = kwargs.pop('maxlen', None)
         OrderedDict.__init__(self, *args, **kwargs)
-        
+
     def __setitem__(self, key, value):
         if self.maxlen is not None and len(self) >= self.maxlen:
             self.popitem(0) #pop oldest
@@ -144,7 +146,7 @@ class ImzMLWriter(object):
         :return:
             None
         """
-        
+
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
         self.mode = mode
@@ -167,14 +169,14 @@ class ImzMLWriter(object):
         self.first_mz = None
         self.hashes = defaultdict(list) #mz_hash -> list of mz_data (disk location)
         self.lru_cache = MaxlenDict(maxlen=10) #mz_array (as tuple) -> mz_data (disk location)
-        
+
     @staticmethod
     def _np_type_to_name(dtype):
         if dtype.__name__.startswith('float'):
             return "%s-bit float"%dtype.__name__[5:]
         elif dtype.__name__.startswith('int'):
             return "%s-bit integer"%dtype.__name__[3:]
-            
+
     def _write_xml(self):
         spectra = self.spectra
         mz_data_type = self._np_type_to_name(self.mz_dtype)
@@ -206,7 +208,7 @@ class ImzMLWriter(object):
         bytes = data.tobytes()
         bytes = compression.compress(bytes)
         return offset, data.shape[0], self._write_ibd(bytes)
-        
+
     def _read_mz(self, mz_offset, mz_len, mz_enc_len):
         '''reads a mz array from the currently open ibd file'''
         self.ibd.seek(mz_offset)
@@ -221,14 +223,14 @@ class ImzMLWriter(object):
         mzs = tuple(mzs) #must be hashable
         if mzs in self.lru_cache:
             return self.lru_cache[mzs]
-            
+
         #mz not recognized ... check hash
         mz_hash = "%s-%s-%s"%(hash(mzs), sum(mzs), len(mzs))
         if mz_hash in self.hashes:
             for mz_data in self.hashes[mz_hash]:
                 test_mz = self._read_mz(*mz_data)
                 if mzs == test_mz:
-                    self.lru_cache[test_mz] = mz_data 
+                    self.lru_cache[test_mz] = mz_data
                     return mz_data
         #hash not recognized
         #must be a new mz array ... write it, add it to lru_cache and hashes
@@ -236,7 +238,7 @@ class ImzMLWriter(object):
         self.hashes[mz_hash].append(mz_data)
         self.lru_cache[mzs] = mz_data
         return mz_data
-    
+
     def addSpectrum(self, mzs, intensities, coords):
         """
         Add a mass spectrum to the file.
@@ -255,7 +257,7 @@ class ImzMLWriter(object):
         if self.mode != "continuous" or self.first_mz is None:
             mzs = self.mz_compression.rounding(mzs)
         intensities = self.intensity_compression.rounding(intensities)
-        
+
         if self.mode == "continuous":
             if self.first_mz is None:
                 self.first_mz = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
@@ -267,7 +269,7 @@ class ImzMLWriter(object):
         else:
             raise TypeError("Unknown mode: %s"%self.mode)
         mz_offset, mz_len, mz_enc_len = mz_data
-            
+
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
 
         s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len)
