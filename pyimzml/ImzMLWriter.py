@@ -82,6 +82,11 @@ IMZML_TEMPLATE = """\
             @if len(s.coords) == 3:
             <cvParam accession="IMS:1000052" cvRef="IMS" name="position z" value="@{s.coords[2]!!s}"/>
             @end
+            <cvParam cvRef="MS" accession="MS:1000528" name="lowest observed m/z" value="@{s.mz_min!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000527" name="highest observed m/z" value="@{s.mz_max!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="@{s.mz_base!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="@{s.int_base!!s}" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
+            <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="@{s.int_tic!!s}"/>
           </scan>
         </scanList>
         <binaryDataArrayList count="2">
@@ -117,7 +122,7 @@ class MaxlenDict(OrderedDict):
             self.popitem(0) #pop oldest
         OrderedDict.__setitem__(self, key, value)
 
-Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len')
+Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
 
 class ImzMLWriter(object):
     def __init__(self, output_filename,
@@ -271,8 +276,13 @@ class ImzMLWriter(object):
         mz_offset, mz_len, mz_enc_len = mz_data
 
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
-
-        s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len)
+        mz_min = np.min(mzs)
+        mz_max = np.max(mzs)
+        ix_max = np.argmax(intensities)
+        mz_base =  mzs[ix_max]
+        int_base = intensities[ix_max]
+        int_tic = np.sum(intensities)
+        s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic)
         self.spectra.append(s)
 
     def close(self): #'close' is a more common use for this
