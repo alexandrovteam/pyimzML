@@ -164,7 +164,7 @@ class ImzMLParser:
             z = scan_elem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
             self.coordinates.append((int(x), int(y), int(z)))
         except AttributeError:
-            self.coordinates.append((int(x), int(y)))
+            self.coordinates.append((int(x), int(y), 0))
 
     def __readimzmlmeta(self):
         """
