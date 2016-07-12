@@ -62,7 +62,7 @@ following generalized approach is recommended
 
 .. code-block:: python
 
-    for i, (x,y) in enumerate(p.coordinates):
+    for i, (x,y,z) in enumerate(p.coordinates):
         p.getspectrum(i)
 
 Each spectrum is a tuple of two lists, the m/z array and the intensity array,

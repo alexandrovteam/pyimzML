@@ -41,7 +41,8 @@ class ImzMLParser:
     Iteratively reads the .imzML file into memory while pruning the per-spectrum metadata (everything in
     <spectrumList> elements) during initialization. Returns a spectrum upon calling getspectrum(i). The binary file
     is read in every call of getspectrum(i). Use enumerate(parser.coordinates) to get all coordinates with their
-    respective index. Relevant meta data is stored in parser.imzmldict
+    respective index. Coordinates are always 3-dimensional. If the third spatial dimension is not present in
+    the data, it will be set to zero. Relevant meta data is stored in parser.imzmldict
     """
 
     def __init__(self, filename):
@@ -67,7 +68,7 @@ class ImzMLParser:
         self.intensityOffsets = []
         self.mzLengths = []
         self.intensityLengths = []
-        # list of all (x,y) or (x,y,z) coordinates as tuples.
+        # list of all (x,y,z) coordinates as tuples.
         self.coordinates = []
         self.root = None
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
@@ -238,7 +239,7 @@ class ImzMLParser:
             pixel_size_y = self.imzmldict["pixel size y"]
         except KeyError:
             raise KeyError("Could not find all pixel size attributes in imzML file")
-        image_x, image_y = self.coordinates[i]
+        image_x, image_y = self.coordinates[i][:2]
         return image_x * pixel_size_x, image_y * pixel_size_y
 
     def getspectrum(self, index):
@@ -294,7 +295,7 @@ class ImzMLParser:
         return mz_string, intensity_string
 
 
-def getionimage(p, mz_value, tol=0.1, z=None, reduce_func=sum):
+def getionimage(p, mz_value, tol=0.1, z=0, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
@@ -319,18 +320,12 @@ def getionimage(p, mz_value, tol=0.1, z=None, reduce_func=sum):
         pixel. Can be easily plotted with matplotlib
     """
     tol = abs(tol)
-    if z:
-        im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"], z))
-        for i, (x, y, z) in enumerate(p.coordinates):
+    im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
+    for i, (x, y, z_) in enumerate(p.coordinates):
+        if z_ == z:
             mzs, ints = p.getspectrum(i)
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
             im[y - 1, x - 1, z - 1] = reduce_func(ints[min_i:max_i])
-    else:
-        im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
-        for i, (x, y,) in enumerate(p.coordinates):
-            mzs, ints = p.getspectrum(i)
-            min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i])
     return im
 
 
