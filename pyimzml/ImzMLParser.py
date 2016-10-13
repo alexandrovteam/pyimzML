@@ -325,7 +325,7 @@ def getionimage(p, mz_value, tol=0.1, z=0, reduce_func=sum):
         if z_ == z:
             mzs, ints = p.getspectrum(i)
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1, z - 1] = reduce_func(ints[min_i:max_i])
+            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i])
     return im
 
 
