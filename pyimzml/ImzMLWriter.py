@@ -112,7 +112,7 @@ IMZML_TEMPLATE = """\
 </mzML>
 """
 
-class MaxlenDict(OrderedDict):
+class _MaxlenDict(OrderedDict):
     def __init__(self, *args, **kwargs):
         self.maxlen = kwargs.pop('maxlen', None)
         OrderedDict.__init__(self, *args, **kwargs)
@@ -122,14 +122,11 @@ class MaxlenDict(OrderedDict):
             self.popitem(0) #pop oldest
         OrderedDict.__setitem__(self, key, value)
 
-Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
+_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
 
 class ImzMLWriter(object):
-    def __init__(self, output_filename,
-        mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
-        mz_compression=NoCompression(), intensity_compression=NoCompression()):
-        """
-        Create an imzML file set.
+    """
+        Create an imzML+ibd file.
 
         :param output_filename:
             is used to make the base name by removing the extension (if any).
@@ -139,18 +136,19 @@ class ImzMLWriter(object):
         :param mz_dtype:
             The numpy data type to use for saving mz array values
         :param mode:
-            "continuous" mode will save the first mz array only
-            "processed" mode save every mz array seperately
-            "auto" mode writes only mz arrays that have not already been written
+
+            * "continuous" mode will save the first mz array only
+            * "processed" mode save every mz array separately
+            * "auto" mode writes only mz arrays that have not already been written
         :param intensity_compression:
             How to compress the intensity data before saving
-            must be an instance of NoCompression or ZlibCompression
+            must be an instance of :class:`~pyimzml.compression.NoCompression` or :class:`~pyimzml.compression.ZlibCompression`
         :param mz_compression:
             How to compress the mz array data before saving
-            must be an instance of NoCompression or ZlibCompression
-        :return:
-            None
-        """
+    """
+    def __init__(self, output_filename,
+                 mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
+                 mz_compression=NoCompression(), intensity_compression=NoCompression()):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
@@ -172,26 +170,26 @@ class ImzMLWriter(object):
 
         self.spectra = []
         self.first_mz = None
-        self.hashes = defaultdict(list) #mz_hash -> list of mz_data (disk location)
-        self.lru_cache = MaxlenDict(maxlen=10) #mz_array (as tuple) -> mz_data (disk location)
+        self.hashes = defaultdict(list)  # mz_hash -> list of mz_data (disk location)
+        self.lru_cache = _MaxlenDict(maxlen=10)  # mz_array (as tuple) -> mz_data (disk location)
 
     @staticmethod
     def _np_type_to_name(dtype):
         if dtype.__name__.startswith('float'):
-            return "%s-bit float"%dtype.__name__[5:]
+            return "%s-bit float" % dtype.__name__[5:]
         elif dtype.__name__.startswith('int'):
-            return "%s-bit integer"%dtype.__name__[3:]
+            return "%s-bit integer" % dtype.__name__[3:]
 
     def _write_xml(self):
         spectra = self.spectra
         mz_data_type = self._np_type_to_name(self.mz_dtype)
         int_data_type = self._np_type_to_name(self.intensity_dtype)
         obo_codes = {"16-bit float": "1000520",
-            "32-bit integer": "1000519", "32-bit float": "1000521",
-            "64-bit integer": "1000522", "64-bit float": "1000523",
-            "continuous": "1000030", "processed": "1000031",
-            "zlib compression": "1000574", "no compression": "1000576"}
-        uuid = ("{%s}"%self.uuid).upper()
+                     "32-bit integer": "1000519", "32-bit float": "1000521",
+                     "64-bit integer": "1000522", "64-bit float": "1000523",
+                     "continuous": "1000030", "processed": "1000031",
+                     "zlib compression": "1000574", "no compression": "1000576"}
+        uuid = ("{%s}" % self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
         mz_compression = self.mz_compression.name
@@ -225,20 +223,20 @@ class ImzMLWriter(object):
     def _get_previous_mz(self, mzs):
         '''given an mz array, return the mz_data (disk location)
         if the mz array was not previously written, write to disk first'''
-        mzs = tuple(mzs) #must be hashable
+        mzs = tuple(mzs)  # must be hashable
         if mzs in self.lru_cache:
             return self.lru_cache[mzs]
 
-        #mz not recognized ... check hash
-        mz_hash = "%s-%s-%s"%(hash(mzs), sum(mzs), len(mzs))
+        # mz not recognized ... check hash
+        mz_hash = "%s-%s-%s" % (hash(mzs), sum(mzs), len(mzs))
         if mz_hash in self.hashes:
             for mz_data in self.hashes[mz_hash]:
                 test_mz = self._read_mz(*mz_data)
                 if mzs == test_mz:
                     self.lru_cache[test_mz] = mz_data
                     return mz_data
-        #hash not recognized
-        #must be a new mz array ... write it, add it to lru_cache and hashes
+        # hash not recognized
+        # must be a new mz array ... write it, add it to lru_cache and hashes
         mz_data = self._encode_and_write(mzs, self.mz_dtype, self.mz_compression)
         self.hashes[mz_hash].append(mz_data)
         self.lru_cache[mzs] = mz_data
@@ -253,12 +251,14 @@ class ImzMLWriter(object):
         :param intensities:
             intensity array
         :param coords:
-            2-tuple of x and y position OR
-            3-tuple of x, y, and z position
+
+            * 2-tuple of x and y position OR
+            * 3-tuple of x, y, and z position
+
             note some applications want coords to be 1-indexed
         """
-        #must be rounded now to allow comparisons to later data
-        #but don't waste CPU time in continuous mode since the data will not be used anyway
+        # must be rounded now to allow comparisons to later data
+        # but don't waste CPU time in continuous mode since the data will not be used anyway
         if self.mode != "continuous" or self.first_mz is None:
             mzs = self.mz_compression.rounding(mzs)
         intensities = self.intensity_compression.rounding(intensities)
@@ -272,24 +272,28 @@ class ImzMLWriter(object):
         elif self.mode == "auto":
             mz_data = self._get_previous_mz(mzs)
         else:
-            raise TypeError("Unknown mode: %s"%self.mode)
+            raise TypeError("Unknown mode: %s" % self.mode)
         mz_offset, mz_len, mz_enc_len = mz_data
 
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
         mz_min = np.min(mzs)
         mz_max = np.max(mzs)
         ix_max = np.argmax(intensities)
-        mz_base =  mzs[ix_max]
+        mz_base = mzs[ix_max]
         int_base = intensities[ix_max]
         int_tic = np.sum(intensities)
-        s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic)
+        s = _Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic)
         self.spectra.append(s)
 
-    def close(self): #'close' is a more common use for this
-        '''writes the XML file and closes all files'''
+    def close(self):  # 'close' is a more common use for this
+        """
+        Writes the XML file and closes all files.
+        Will be called automatically if ``with``-pattern is used.
+        """
         self.finish()
 
     def finish(self):
+        '''alias of close()'''
         self.ibd.close()
         self._write_xml()
         self.xml.close()
@@ -304,7 +308,7 @@ class ImzMLWriter(object):
             self.ibd.close()
             self.xml.close()
 
-def main(argv):
+def _main(argv):
     from pyimzml.ImzMLParser import ImzMLParser
     inputfile = ''
     outputfile = ''
@@ -343,4 +347,4 @@ def main(argv):
     print(spectra[0] == spectra2[0])
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    _main(sys.argv[1:])

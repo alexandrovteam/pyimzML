@@ -1,23 +1,47 @@
-.. pyMS documentation master file, created by
-   sphinx-quickstart on Tue Feb  9 15:19:18 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-Welcome to pyimzML's documentation!
+Welcome to pyimzML documentation!
 ===================================
 
 .. toctree::
    :maxdepth: 2
 
+This package provides a parser of imzML format as well as a simple imzML writer.
 
-Readme
-------
+Typical usage pattern is as follows:
 
-The :doc:`README <README>` should provide you with an overview and usage instructions. Or take a look at the developer
-documentation below for more details.
+.. code-block:: python
 
-Indices and tables
-------------------
+    from pyimzml.ImzMLParser import ImzMLParser
 
-* :ref:`genindex`
-* :ref:`modindex`
+    p = ImzMLParser('Example.imzML')
+    for idx, (x,y,z) in enumerate(p.coordinates):
+        mzs, intensities = p.getspectrum(idx)
+        # ...
+
+    from pyimzml.ImzMLWriter import ImzMLWriter
+
+    with ImzMLWriter('output.imzML') as w:
+        for mzs, intensities, coords in my_spectra:
+            # writes data to the .ibd file
+            writer.addSpectrum(mzs, intensities, coords)
+    # at this point imzML file is written and files are closed
+
+
+.. _api:
+
+API Reference
+=============
+
+.. automodule:: pyimzml.ImzMLParser
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: pyimzml.ImzMLWriter
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: pyimzml.compression
+    :members:
+    :undoc-members:
+    :show-inheritance:

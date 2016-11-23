@@ -1,8 +1,11 @@
-
 import zlib
 
 class NoCompression(object):
-    name = "no compression"
+    """
+    No compression.
+    """
+    def __init__(self):
+        pass
 
     def rounding(self, data):
         return data
@@ -13,16 +16,22 @@ class NoCompression(object):
     def decompress(self, bytes):
         return bytes
 
+    name = "no compression"
 
 class ZlibCompression(object):
-    name = "zlib compression"
+    """
+    Zlib compression with optional rounding of values.
+    Rounding helps the compression, but is lossy.
 
+    :param round_amt:
+        Number of digits after comma. None means no rounding.
+    """
     def __init__(self, round_amt=None):
         self.round_amt = round_amt
 
     def rounding(self, data):
         if self.round_amt is not None:
-            return [round(x,self.round_amt) for x in data] #rounding helps the compression, but is lossy
+            return [round(x, self.round_amt) for x in data]
         return data
 
     def compress(self, bytes):
@@ -30,3 +39,5 @@ class ZlibCompression(object):
 
     def decompress(self, bytes):
         return zlib.decompress(bytes)
+
+    name = "zlib compression"

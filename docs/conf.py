@@ -25,9 +25,6 @@ from pyimzml import __version__  # noqa
 
 rtd_gen_docs.main()
 
-# see http://www.sphinx-doc.org/en/stable/ext/autodoc.html#confval-autodoc_mock_imports
-autodoc_mock_imports = ['numpy']
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.

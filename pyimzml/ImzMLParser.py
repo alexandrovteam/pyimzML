@@ -42,7 +42,11 @@ class ImzMLParser:
     <spectrumList> elements) during initialization. Returns a spectrum upon calling getspectrum(i). The binary file
     is read in every call of getspectrum(i). Use enumerate(parser.coordinates) to get all coordinates with their
     respective index. Coordinates are always 3-dimensional. If the third spatial dimension is not present in
-    the data, it will be set to zero. Relevant meta data is stored in parser.imzmldict
+    the data, it will be set to zero.
+
+    *pyimzML* has limited support for the metadata embedded in the imzML file. For some general metadata, you can use
+    the parser's ``ìmzmldict`` attribute. You can find the exact list of supported metadata in the documentation of the
+    ``__readimzmlmeta`` method.
     """
 
     def __init__(self, filename):
@@ -257,7 +261,7 @@ class ImzMLParser:
         intensity_array:
             Sequence of intensity values corresponding to mz_array
         """
-        mz_string, intensity_string = self.get_spectrum_as_string(index)
+        mz_string, intensity_string = self._get_spectrum_as_string(index)
         mz_fmt = '<' + str(int(len(mz_string) / self.sizeDict[self.mzPrecision])) + self.mzPrecision
         intensity_fmt = '<' + str(
             int(len(intensity_string) / self.sizeDict[self.intensityPrecision])) + self.intensityPrecision
@@ -265,7 +269,7 @@ class ImzMLParser:
         intensity_array = struct.unpack(intensity_fmt, intensity_string)
         return mz_array, intensity_array
 
-    def get_spectrum_as_string(self, index):
+    def _get_spectrum_as_string(self, index):
         """
         Reads m/z array and intensity array of the spectrum at specified location
         from the binary file as a byte string. The string can be unpacked by the struct
@@ -331,7 +335,24 @@ def getionimage(p, mz_value, tol=0.1, z=0, reduce_func=sum):
 
 def browse(p):
     """
-    Create a metadata browser for the parser.
+    Create a per-spectrum metadata browser for the parser.
+    Usage::
+
+        # get a list of the instrument configurations used in the first pixel
+        instrument_configurations = browse(p).for_spectrum(0).get_ids("instrumentConfiguration")
+
+    Currently, ``instrumentConfiguration``, ``dataProcessing`` and ``referenceableParamGroup`` are supported.
+
+    For browsing all spectra iteratively, you should by all means use **ascending** indices. Doing otherwise can result
+    in quadratic runtime. The following example shows how to retrieve all unique instrumentConfigurations used::
+
+        browser = browse(p)
+        all_config_ids = set()
+        for i, _ in enumerate(p.coordinates):
+            all_config_ids.update(browser.for_spectrum(i).get_ids("instrumentConfiguration"))
+
+    This is a list of ids with which you can find the corresponding ``<instrumentConfiguration>`` tag in the xml tree.
+
     :param p: the parser
     :return: the browser
     """
