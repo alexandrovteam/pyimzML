@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 import sys
 
 try:
@@ -360,7 +360,7 @@ def browse(p):
 
 
 def _bisect_spectrum(mzs, mz_value, tol):
-    return bisect_left(mzs, mz_value - tol), bisect_left(mzs, mz_value + tol) + 1
+    return bisect_left(mzs, mz_value - tol), bisect_right(mzs, mz_value + tol) - 1
 
 
 class _ImzMLMetaDataBrowser(object):
