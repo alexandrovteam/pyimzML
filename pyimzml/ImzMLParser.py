@@ -327,9 +327,9 @@ def getionimage(p, mz_value, tol=0.1, z=0, reduce_func=sum):
     im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
     for i, (x, y, z_) in enumerate(p.coordinates):
         if z_ == z:
-            mzs, ints = p.getspectrum(i)
+            mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i])
+            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
     return im
 
 
@@ -360,7 +360,12 @@ def browse(p):
 
 
 def _bisect_spectrum(mzs, mz_value, tol):
-    return bisect_left(mzs, mz_value - tol), bisect_right(mzs, mz_value + tol) - 1
+    ix_l, ix_u = bisect_left(mzs, mz_value - tol), bisect_right(mzs, mz_value + tol) - 1
+    if mzs[ix_l] < (mz_value - tol):
+        ix_l += 1
+    if mzs[ix_u] > (mz_value + tol):
+        ix_u -= 1
+    return ix_l, ix_u
 
 
 class _ImzMLMetaDataBrowser(object):
