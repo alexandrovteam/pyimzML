@@ -126,6 +126,23 @@ class ImzMLParser:
                         self.intGroupId = elem.attrib['id']
                         int_group = elem
         self.__assign_precision(int_group, mz_group)
+        self.__fix_offsets()
+
+    def __fix_offsets(self):
+        # clean up the mess after morons who use signed 32-bit where unsigned 64-bit is appropriate
+        def fix(array):
+            fixed = []
+            delta = 0
+            prev_value = float('nan')
+            for value in array:
+                if value < 0 and prev_value >= 0:
+                    delta += 2**32
+                fixed.append(value + delta)
+                prev_value = value
+            return fixed
+
+        self.mzOffsets = fix(self.mzOffsets)
+        self.intensityOffsets = fix(self.intensityOffsets)
 
     def __assign_precision(self, int_group, mz_group):
         valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
