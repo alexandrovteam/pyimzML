@@ -163,7 +163,7 @@ class ImzMLWriter(object):
         self.sha1 = hashlib.sha1()
         self.uuid = uuid.uuid4()
 
-        self._write_ibd(self.uuid.bytes_le)
+        self._write_ibd(self.uuid.bytes)
 
         self.wheezy_engine = Engine(loader=DictLoader({'imzml': IMZML_TEMPLATE}), extensions=[CoreExtension()])
         self.imzml_template = self.wheezy_engine.get_template('imzml')
