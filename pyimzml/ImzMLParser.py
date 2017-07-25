@@ -84,6 +84,7 @@ class ImzMLParser:
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method __readimzmlmeta()
         self.imzmldict = self.__readimzmlmeta()
+        self.imzmldict['max count of pixels z'] = np.asarray(self.coordinates)[:,2].max()
 
     # system method for use of 'with ... as'
     def __enter__(self):
@@ -186,7 +187,7 @@ class ImzMLParser:
             z = scan_elem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
             self.coordinates.append((int(x), int(y), int(z)))
         except AttributeError:
-            self.coordinates.append((int(x), int(y), 0))
+            self.coordinates.append((int(x), int(y), 1))
 
     def __readimzmlmeta(self):
         """
