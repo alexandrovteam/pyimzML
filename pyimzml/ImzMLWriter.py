@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -31,6 +31,16 @@ IMZML_TEMPLATE = """\
   </fileDescription>
 
   <referenceableParamGroupList count="2">
+    <referenceableParamGroup id="spectrum">
+      <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
+      <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="0"/>
+      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
+      @if polarity=='positive':
+      <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
+      @elif polarity=='negative':
+      <cvParam cvRef="MS" accession="MS:1000129" name="negative scan" value=""/>
+      @end
+    </referenceableParamGroup>
     <referenceableParamGroup id="mzArray">
       <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
       <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
@@ -87,6 +97,11 @@ IMZML_TEMPLATE = """\
             <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="@{s.mz_base!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
             <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="@{s.int_base!!s}" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
             <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="@{s.int_tic!!s}"/>
+            @if s.userParams:
+                @for up in s.userParams:
+                <userParam name="@up['name']" value="@up['value']"/> 
+                @end
+            @end
           </scan>
         </scanList>
         <binaryDataArrayList count="2">
@@ -122,10 +137,10 @@ class MaxlenDict(OrderedDict):
             self.popitem(0) #pop oldest
         OrderedDict.__setitem__(self, key, value)
 
-Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
+Spectrum = namedtuple('Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic userParams') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
 
 class ImzMLWriter(object):
-    def __init__(self, output_filename,
+    def __init__(self, output_filename, polarity=None,
         mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
         mz_compression=NoCompression(), intensity_compression=NoCompression()):
         """
@@ -151,7 +166,7 @@ class ImzMLWriter(object):
         :return:
             None
         """
-
+        self._setPolarity(polarity)
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
         self.mode = mode
@@ -169,7 +184,6 @@ class ImzMLWriter(object):
 
         self.wheezy_engine = Engine(loader=DictLoader({'imzml': IMZML_TEMPLATE}), extensions=[CoreExtension()])
         self.imzml_template = self.wheezy_engine.get_template('imzml')
-
         self.spectra = []
         self.first_mz = None
         self.hashes = defaultdict(list) #mz_hash -> list of mz_data (disk location)
@@ -181,6 +195,15 @@ class ImzMLWriter(object):
             return "%s-bit float"%dtype.__name__[5:]
         elif dtype.__name__.startswith('int'):
             return "%s-bit integer"%dtype.__name__[3:]
+
+    def _setPolarity(self, polarity):
+        if polarity:
+            if polarity.lower() in ['positive', 'negative']:
+                self.polarity = polarity.lower()
+            else:
+                raise ValueError('value for polarity must be one of "positive", "negative". Received: {}'.format(polarity))
+        else:
+            self.polarity = ""
 
     def _write_xml(self):
         spectra = self.spectra
@@ -200,6 +223,7 @@ class ImzMLWriter(object):
             mode = "processed" if len(self.lru_cache) > 1 else "continuous"
         else:
             mode = self.mode
+        polarity = self.polarity
         self.xml.write(self.imzml_template.render(locals()))
 
     def _write_ibd(self, bytes):
@@ -244,7 +268,7 @@ class ImzMLWriter(object):
         self.lru_cache[mzs] = mz_data
         return mz_data
 
-    def addSpectrum(self, mzs, intensities, coords):
+    def addSpectrum(self, mzs, intensities, coords, userParams=[]):
         """
         Add a mass spectrum to the file.
 
@@ -282,7 +306,7 @@ class ImzMLWriter(object):
         mz_base =  mzs[ix_max]
         int_base = intensities[ix_max]
         int_tic = np.sum(intensities)
-        s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic)
+        s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
         self.spectra.append(s)
 
     def close(self): #'close' is a more common use for this
