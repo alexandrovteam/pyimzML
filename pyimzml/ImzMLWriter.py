@@ -306,7 +306,7 @@ class ImzMLWriter(object):
         mz_base = mzs[ix_max]
         int_base = intensities[ix_max]
         int_tic = np.sum(intensities)
-        s = Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
+        s = _Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
         self.spectra.append(s)
 
     def close(self):  # 'close' is a more common use for this
