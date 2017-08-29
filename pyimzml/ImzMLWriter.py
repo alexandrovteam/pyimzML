@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity, userParams)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -137,7 +137,7 @@ class _MaxlenDict(OrderedDict):
             self.popitem(0) #pop oldest
         OrderedDict.__setitem__(self, key, value)
 
-_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
+_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic', 'userParams') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
 
 class ImzMLWriter(object):
     """
