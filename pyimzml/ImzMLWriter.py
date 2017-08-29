@@ -137,7 +137,7 @@ class _MaxlenDict(OrderedDict):
             self.popitem(0) #pop oldest
         OrderedDict.__setitem__(self, key, value)
 
-_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic', 'userParams') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
+_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic userParams') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
 
 class ImzMLWriter(object):
     """
