@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity, userParams)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -163,7 +163,8 @@ class ImzMLWriter(object):
     """
     def __init__(self, output_filename,
                  mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
-                 mz_compression=NoCompression(), intensity_compression=NoCompression()):
+                 mz_compression=NoCompression(), intensity_compression=NoCompression(),
+                 polarity=None):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
@@ -186,6 +187,7 @@ class ImzMLWriter(object):
         self.first_mz = None
         self.hashes = defaultdict(list)  # mz_hash -> list of mz_data (disk location)
         self.lru_cache = _MaxlenDict(maxlen=10)  # mz_array (as tuple) -> mz_data (disk location)
+        self._setPolarity(polarity)
 
     @staticmethod
     def _np_type_to_name(dtype):

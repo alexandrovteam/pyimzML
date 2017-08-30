@@ -1,6 +1,8 @@
 import unittest
+import numpy as np
 from context import getspectrum
 import pyimzml.ImzMLParser as imzmlp
+import pyimzml.ImzMLWriter as imzmlw
 
 class ImzMLParser(unittest.TestCase):
     def test_bisect(self):
@@ -13,6 +15,15 @@ class ImzMLParser(unittest.TestCase):
         assert ix_l <= ix_u
         assert mzs[ix_l] >= test_mz - test_tol
         assert mzs[ix_u] <= test_mz + test_tol
+
+
+class ImzMLWriter(unittest.TestCase):
+    def test_simple_write(self):
+        mzs = np.linspace(100,1000,20)
+        ints = np.random.rand(mzs.shape[0])
+        coords = [1,1,1]
+        with imzmlw.ImzMLWriter("test.mzML", mode="processed") as imzml:
+            imzml.addSpectrum(mzs, ints, coords=coords)
 
 if __name__ == '__main__':
     unittest.main()
