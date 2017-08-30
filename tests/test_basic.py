@@ -14,5 +14,13 @@ class ImzMLParser(unittest.TestCase):
         assert mzs[ix_l] >= test_mz - test_tol
         assert mzs[ix_u] <= test_mz + test_tol
 
+        test_mz = 401.0
+        test_tol = 0.1
+        ix_l, ix_u = imzmlp._bisect_spectrum(mzs, test_mz, test_tol)
+        print(ix_l, ix_u, len(mzs))
+        assert ix_l == 7
+        assert ix_u == 7
+        assert ix_l <= ix_u
+
 if __name__ == '__main__':
     unittest.main()
