@@ -16,7 +16,6 @@ class ImzMLParser(unittest.TestCase):
         assert mzs[ix_l] >= test_mz - test_tol
         assert mzs[ix_u] <= test_mz + test_tol
 
-
 class ImzMLWriter(unittest.TestCase):
     def test_simple_write(self):
         mzs = np.linspace(100,1000,20)
