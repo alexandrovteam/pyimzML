@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity, image_size)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -63,6 +63,8 @@ IMZML_TEMPLATE = """\
     <scanSettings id="scanSettings1">
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="@{(max(s.coords[0] for s in spectra))!!s}"/>
       <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="@{(max(s.coords[1] for s in spectra))!!s}"/>
+      <cvParam cvRef="IMS" accession="IMS:1000044" name="max max dimension x" value="@{image_size[0]!!s}" unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"/>
+      <cvParam cvRef="IMS" accession="IMS:1000045" name="max max dimension y" value="@{image_size[1]!!s}" unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"/>
     </scanSettings>
   </scanSettingsList>
 
@@ -164,7 +166,7 @@ class ImzMLWriter(object):
     def __init__(self, output_filename,
                  mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
                  mz_compression=NoCompression(), intensity_compression=NoCompression(),
-                 polarity=None):
+                 polarity=None, image_size = None):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
@@ -188,6 +190,7 @@ class ImzMLWriter(object):
         self.hashes = defaultdict(list)  # mz_hash -> list of mz_data (disk location)
         self.lru_cache = _MaxlenDict(maxlen=10)  # mz_array (as tuple) -> mz_data (disk location)
         self._setPolarity(polarity)
+        self._image_size = image_size
 
     @staticmethod
     def _np_type_to_name(dtype):
@@ -224,6 +227,7 @@ class ImzMLWriter(object):
         else:
             mode = self.mode
         polarity = self.polarity
+        image_size = self.image_size
         self.xml.write(self.imzml_template.render(locals()))
 
     def _write_ibd(self, bytes):
@@ -268,6 +272,27 @@ class ImzMLWriter(object):
         self.lru_cache[mzs] = mz_data
         return mz_data
 
+    @property
+    def image_size(self):
+        """
+        :return: the image dimensions in micrometers, if possible 
+        """
+        if not self._image_size:
+
+            if "xCoord" in [k['name'] for k in self.spectra[0].userParams]:
+                coords = []
+                for spectrum in self.spectra:
+                    x_coord = [k['value'] for k in spectrum.userParams if k['name'] == 'xCoord']
+                    y_coord = [k['value'] for k in spectrum.userParams if k['name'] == 'yCoord']
+                    coords.append([x_coord[0], y_coord[0]])
+                coords = np.asarray(coords, dtype=float)
+                self._image_size = np.max(coords, axis=0) - np.min(coords, axis=0)
+            else:
+                coords = [spectrum.coords for spectrum in self.spectra]
+                coords = np.asarray(coords)
+                return np.max(coords, axis=0) - np.min(coords, axis=0)
+        return self._image_size
+
     def addSpectrum(self, mzs, intensities, coords, userParams=[]):
         """
         Add a mass spectrum to the file.
@@ -282,6 +307,9 @@ class ImzMLWriter(object):
             * 3-tuple of x, y, and z position
 
             note some applications want coords to be 1-indexed
+        :param userParams:
+             list of dicts
+             each dict in list should have the form {'name': paramname, 'value': paramvalue}
         """
         # must be rounded now to allow comparisons to later data
         # but don't waste CPU time in continuous mode since the data will not be used anyway

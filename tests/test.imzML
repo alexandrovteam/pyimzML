@@ -9,8 +9,8 @@
     <fileContent>
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000031" name="processed" value=""/>
-      <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="{BD9D148C-B119-4C3B-8FD6-36C0324773C3}"/>
-      <cvParam cvRef="IMS" accession="IMS:1000091" name="ibd SHA-1" value="5032B1355746B510ED5AC33F3D4E203AD9FCFFAC"/>
+      <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="{48CD0FD2-9965-47F0-857A-0D5DB98A3B6B}"/>
+      <cvParam cvRef="IMS" accession="IMS:1000091" name="ibd SHA-1" value="7A7B1A1254CF54EFCF1D2526E2CF43381EC9AD36"/>
     </fileContent>
   </fileDescription>
 
@@ -41,7 +41,9 @@
   <scanSettingsList count="1">
     <scanSettings id="scanSettings1">
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="1"/>
-      <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="1"/>
+      <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="2"/>
+      <cvParam cvRef="IMS" accession="IMS:1000044" name="max max dimension x" value="0.0"/>
+      <cvParam cvRef="IMS" accession="IMS:1000045" name="max max dimension y" value="100.0"/>
     </scanSettings>
   </scanSettingsList>
 
@@ -59,7 +61,7 @@
   </dataProcessingList>
 
   <run defaultInstrumentConfigurationRef="IC1" id="test">
-    <spectrumList count="1" defaultDataProcessingRef="export_from_pyimzml">
+    <spectrumList count="2" defaultDataProcessingRef="export_from_pyimzml">
       <spectrum defaultArrayLength="0" id="spectrum=1" index="1">
         <referenceableParamGroupRef ref="spectrum"/>
         <scanList count="1">
@@ -70,9 +72,11 @@
             <cvParam accession="IMS:1000052" cvRef="IMS" name="position z" value="1"/>
             <cvParam cvRef="MS" accession="MS:1000528" name="lowest observed m/z" value="100.0" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
             <cvParam cvRef="MS" accession="MS:1000527" name="highest observed m/z" value="1000.0" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
-            <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="242.105263158" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
-            <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="0.977208708265" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
-            <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="10.2625324823"/>
+            <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="384.210526316" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="0.974293143947" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
+            <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="11.4841348919"/>
+                <userParam name="xCoord" value="50"/> 
+                <userParam name="yCoord" value="100"/> 
           </scan>
         </scanList>
         <binaryDataArrayList count="2">
@@ -88,6 +92,40 @@
             <cvParam accession="IMS:1000103" cvRef="IMS" name="external array length" value="20"/>
             <cvParam accession="IMS:1000104" cvRef="IMS" name="external encoded length" value="80"/>
             <cvParam accession="IMS:1000102" cvRef="IMS" name="external offset" value="176"/>
+            <binary/>
+          </binaryDataArray>
+        </binaryDataArrayList>
+      </spectrum>
+      <spectrum defaultArrayLength="0" id="spectrum=2" index="2">
+        <referenceableParamGroupRef ref="spectrum"/>
+        <scanList count="1">
+          <cvParam accession="MS:1000795" cvRef="MS" name="no combination"/>
+          <scan instrumentConfigurationRef="instrumentConfiguration0">
+            <cvParam accession="IMS:1000050" cvRef="IMS" name="position x" value="1"/>
+            <cvParam accession="IMS:1000051" cvRef="IMS" name="position y" value="2"/>
+            <cvParam accession="IMS:1000052" cvRef="IMS" name="position z" value="1"/>
+            <cvParam cvRef="MS" accession="MS:1000528" name="lowest observed m/z" value="100.0" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000527" name="highest observed m/z" value="1000.0" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="810.526315789" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+            <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="0.983062349313" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
+            <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="9.29472762249"/>
+                <userParam name="xCoord" value="50"/> 
+                <userParam name="yCoord" value="200"/> 
+          </scan>
+        </scanList>
+        <binaryDataArrayList count="2">
+          <binaryDataArray encodedLength="0">
+            <referenceableParamGroupRef ref="mzArray"/>
+            <cvParam accession="IMS:1000103" cvRef="IMS" name="external array length" value="20"/>
+            <cvParam accession="IMS:1000104" cvRef="IMS" name="external encoded length" value="160"/>
+            <cvParam accession="IMS:1000102" cvRef="IMS" name="external offset" value="256"/>
+            <binary/>
+          </binaryDataArray>
+          <binaryDataArray encodedLength="0">
+            <referenceableParamGroupRef ref="intensityArray"/>
+            <cvParam accession="IMS:1000103" cvRef="IMS" name="external array length" value="20"/>
+            <cvParam accession="IMS:1000104" cvRef="IMS" name="external encoded length" value="80"/>
+            <cvParam accession="IMS:1000102" cvRef="IMS" name="external offset" value="416"/>
             <binary/>
           </binaryDataArray>
         </binaryDataArrayList>

@@ -15,7 +15,6 @@ class ImzMLParser(unittest.TestCase):
         assert ix_l <= ix_u
         assert mzs[ix_l] >= test_mz - test_tol
         assert mzs[ix_u] <= test_mz + test_tol
-
    		test_mz = 401.0
         test_tol = 0.1
         ix_l, ix_u = imzmlp._bisect_spectrum(mzs, test_mz, test_tol)
@@ -32,6 +31,31 @@ class ImzMLWriter(unittest.TestCase):
         coords = [1,1,1]
         with imzmlw.ImzMLWriter("test.mzML", mode="processed") as imzml:
             imzml.addSpectrum(mzs, ints, coords=coords)
+
+
+    def test_two_spectra_write(self):
+        with imzmlw.ImzMLWriter("test.mzML", mode="processed") as imzml:
+            mzs = np.linspace(100,1000,20)
+            ints = np.random.rand(mzs.shape[0])
+            coords = [1,1,1]
+            imzml.addSpectrum(mzs, ints, coords=coords)
+            ints = np.random.rand(mzs.shape[0])
+            coords = [1, 2, 1]
+            imzml.addSpectrum(mzs, ints, coords=coords)
+
+    def test_userParam_write(self):
+        with imzmlw.ImzMLWriter("test.mzML", mode="processed") as imzml:
+            mzs = np.linspace(100,1000,20)
+            ints = np.random.rand(mzs.shape[0])
+            coords = [1,1,1]
+            pos = [50, 100, 0]
+            userParams = [{'name': 'xCoord', "value": str(pos[0])}, {'name': 'yCoord', 'value': str(pos[1])}]
+            imzml.addSpectrum(mzs, ints, coords=coords, userParams=userParams)
+            ints = np.random.rand(mzs.shape[0])
+            coords = [1, 2, 1]
+            pos = [50, 200, 0]
+            userParams = [{'name': 'xCoord', "value": str(pos[0])}, {'name': 'yCoord', 'value': str(pos[1])}]
+            imzml.addSpectrum(mzs, ints, coords=coords, userParams=userParams)
 
 if __name__ == '__main__':
     unittest.main()
