@@ -317,7 +317,7 @@ class ImzMLParser:
         return mz_string, intensity_string
 
 
-def getionimage(p, mz_value, tol=0.1, z=0, reduce_func=sum):
+def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
@@ -344,6 +344,8 @@ def getionimage(p, mz_value, tol=0.1, z=0, reduce_func=sum):
     tol = abs(tol)
     im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
     for i, (x, y, z_) in enumerate(p.coordinates):
+        if z_ == 0:
+            UserWarning("z coordinate = 0 present, if you're getting blank images set getionimage(.., .., z=0)")
         if z_ == z:
             mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
