@@ -16,6 +16,8 @@
 
 from bisect import bisect_left, bisect_right
 import sys
+import re
+from pathlib import Path
 
 try:
     from lxml.etree import iterparse
@@ -78,13 +80,20 @@ class ImzMLParser:
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
         self.__iter_read_spectrum_meta()
         # name of the binary file
-        bin_filename = self.filename[:-5] + "ibd"
+        bin_filename = self._infer_bin_filename(self.filename)
         self.m = open(bin_filename, "rb")
 
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method __readimzmlmeta()
         self.imzmldict = self.__readimzmlmeta()
         self.imzmldict['max count of pixels z'] = np.asarray(self.coordinates)[:,2].max()
+
+    @staticmethod
+    def _infer_bin_filename(imzml_path):
+        imzml_path = Path(imzml_path)
+        ibd_path = [f for f in imzml_path.parent.glob('*')
+                    if re.match(r'.+\.ibd', str(f), re.IGNORECASE) and f.stem == imzml_path.stem][0]
+        return str(ibd_path)
 
     # system method for use of 'with ... as'
     def __enter__(self):
