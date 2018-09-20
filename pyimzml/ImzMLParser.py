@@ -155,7 +155,7 @@ class ImzMLParser:
         self.intensityOffsets = fix(self.intensityOffsets)
 
     def __assign_precision(self, int_group, mz_group):
-        valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142")
+        valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142", "MS:1000519", "MS:1000522")
         mz_precision = int_precision = None
         for s in valid_accession_strings:
             param = mz_group.find('%scvParam[@accession="%s"]' % (self.sl, s))
