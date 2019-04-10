@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from context import getspectrum
+from .context import getspectrum
 import pyimzml.ImzMLParser as imzmlp
 import pyimzml.ImzMLWriter as imzmlw
 
