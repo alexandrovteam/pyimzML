@@ -19,13 +19,6 @@ import sys
 import re
 from pathlib import Path
 
-try:
-    from lxml.etree import iterparse
-except ImportError:
-    try:
-        from xml.etree.cElementTree import iterparse
-    except ImportError:
-        from xml.etree.ElementTree import iterparse
 import struct
 from warnings import warn
 import numpy as np
@@ -33,6 +26,19 @@ import numpy as np
 param_group_elname = "referenceableParamGroup"
 data_processing_elname = "dataProcessing"
 instrument_confid_elname = "instrumentConfiguration"
+
+
+def choose_iterparse(parse_lib=None):
+    if parse_lib == 'ElementTree':
+        from xml.etree.ElementTree import iterparse
+    elif parse_lib == 'lxml':
+        from lxml.etree import iterparse
+    else:
+        try:
+            from lxml.etree import iterparse
+        except ImportError:
+            from xml.etree.ElementTree import iterparse
+    return iterparse
 
 
 class ImzMLParser:
@@ -51,13 +57,15 @@ class ImzMLParser:
     ``__readimzmlmeta`` method.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename, parse_lib=None):
         """
         Opens the two files corresponding to the file name, reads the entire .imzML
         file and extracts required attributes. Does not read any binary data, yet.
 
         :param filename:
             name of the XML file. Must end with .imzML. Binary data file must be named equally but ending with .ibd
+        :param parse_lib:
+            XML-parsing library to use: 'ElementTree' or 'lxml', the later will be used if argument not provided
         """
         # custom map sizes are currently not supported, therefore mapsize is hardcoded.
         mapsize = 0
@@ -78,6 +86,7 @@ class ImzMLParser:
         self.coordinates = []
         self.root = None
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
+        self.iterparse = choose_iterparse(parse_lib)
         self.__iter_read_spectrum_meta()
         # name of the binary file
         bin_filename = self._infer_bin_filename(self.filename)
@@ -114,7 +123,7 @@ class ImzMLParser:
         """
         mz_group = int_group = None
         slist = None
-        elem_iterator = iterparse(self.filename, events=("start", "end"))
+        elem_iterator = self.iterparse(self.filename, events=("start", "end"))
 
         if sys.version_info > (3,):
             _, self.root = next(elem_iterator)
@@ -409,10 +418,11 @@ class _ImzMLMetaDataBrowser(object):
         self._sl = sl
         self._fn = fn
         self._iter, self._previous, self._list_elem = None, None, None
+        self.iterparse = choose_iterparse()
 
     def for_spectrum(self, i):
         if self._previous is None or i <= self._previous:
-            self._iter = iterparse(self._fn, events=("start", "end"))
+            self._iter = self.iterparse(self._fn, events=("start", "end"))
         for event, s in self._iter:
             if s.tag == self._sl + "spectrumList" and event == "start":
                 self._list_elem = s
