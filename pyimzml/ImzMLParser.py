@@ -77,7 +77,6 @@ class ImzMLParser:
         self.precisionDict = {"32-bit float": 'f', "64-bit float": 'd', "32-bit integer": 'i', "64-bit integer": 'l'}
         # maps each number format character to its amount of bytes used
         self.sizeDict = {'f': 4, 'd': 8, 'i': 4, 'l': 8}
-        self.np_dtypes = {'f': np.float32, 'd': np.float64}
         self.filename = filename
         self.mzOffsets = []
         self.intensityOffsets = []
@@ -299,10 +298,8 @@ class ImzMLParser:
             Sequence of intensity values corresponding to mz_array
         """
         mz_bytes, intensity_bytes = self.get_spectrum_as_string(index)
-        mz_dtype = self.np_dtypes[self.mzPrecision]
-        mz_array = np.frombuffer(mz_bytes, dtype=mz_dtype)
-        intensity_dtype = self.np_dtypes[self.intensityPrecision]
-        intensity_array = np.frombuffer(intensity_bytes, dtype=intensity_dtype)
+        mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
+        intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
         return mz_array, intensity_array
 
     def get_spectrum_as_string(self, index):
