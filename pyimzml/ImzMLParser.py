@@ -291,21 +291,18 @@ class ImzMLParser:
 
         Output:
 
-        mz_array:
+        mz_array: numpy.ndarray
             Sequence of m/z values representing the horizontal axis of the desired mass
             spectrum
-        intensity_array:
+        intensity_array: numpy.ndarray
             Sequence of intensity values corresponding to mz_array
         """
-        mz_string, intensity_string = self._get_spectrum_as_string(index)
-        mz_fmt = '<' + str(int(len(mz_string) / self.sizeDict[self.mzPrecision])) + self.mzPrecision
-        intensity_fmt = '<' + str(
-            int(len(intensity_string) / self.sizeDict[self.intensityPrecision])) + self.intensityPrecision
-        mz_array = struct.unpack(mz_fmt, mz_string)
-        intensity_array = struct.unpack(intensity_fmt, intensity_string)
+        mz_bytes, intensity_bytes = self.get_spectrum_as_string(index)
+        mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
+        intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
         return mz_array, intensity_array
 
-    def _get_spectrum_as_string(self, index):
+    def get_spectrum_as_string(self, index):
         """
         Reads m/z array and intensity array of the spectrum at specified location
         from the binary file as a byte string. The string can be unpacked by the struct
