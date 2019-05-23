@@ -1,3 +1,4 @@
+import pickle
 import unittest
 
 import numpy as np
@@ -66,16 +67,18 @@ class ImzMLParser(unittest.TestCase):
 
 class PortableSpectrumReader(unittest.TestCase):
     def test_read_file(self):
+        spectrum_idx = 4
         for parse_lib, data_name, imzml_path, ibd_path in ALL_TEST_CASES:
             with self.subTest(parse_lib=parse_lib, data=data_name),\
                  imzmlp.ImzMLParser(imzml_path, parse_lib=parse_lib) as normal_parser,\
                  open(ibd_path, 'rb') as ibd_file:
 
-                detached_parser = imzmlp.ImzMLParser(imzml_path, parse_lib=parse_lib, ibd_file=None)
-                portable_reader = detached_parser.portable_spectrum_reader()
-                spectrum_idx = 4
                 normal_mzs, normal_ints = normal_parser.getspectrum(spectrum_idx)
 
+                detached_parser = imzmlp.ImzMLParser(imzml_path, parse_lib=parse_lib, ibd_file=None)
+                portable_reader = detached_parser.portable_spectrum_reader()
+                # Pickle and unpickle to ensure it survives for its intended use case
+                portable_reader = pickle.loads(pickle.dumps(portable_reader))
                 portable_mzs, portable_ints = portable_reader.read_spectrum_from_file(ibd_file, spectrum_idx)
 
                 assert np.all(normal_mzs == portable_mzs)
