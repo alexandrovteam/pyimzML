@@ -24,32 +24,45 @@ IMZML_TEMPLATE = """\
   <fileDescription>
     <fileContent>
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
+      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
       <cvParam cvRef="IMS" accession="IMS:@obo_codes[mode]" name="@mode" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="@uuid"/>
       <cvParam cvRef="IMS" accession="IMS:1000091" name="ibd SHA-1" value="@sha1sum"/>
     </fileContent>
+    <sourceFileList count="1">
+      <sourceFile id="sf1" location="" name="">
+        <cvParam cvRef="MS" accession="MS:1000563" name="Thermo RAW format"/>
+        <cvParam cvRef="MS" accession="MS:1000768" name="Thermo nativeID format"/>
+        <cvParam cvRef="MS" accession="MS:1000569" name="SHA-1" value="6262CD2CB335680E4FCBC01869867B3E19473695"/>
+      </sourceFile>
+    </sourceFileList>
   </fileDescription>
 
-  <referenceableParamGroupList count="2">
+  <referenceableParamGroupList count="4">
+    <referenceableParamGroup id="mzArray">
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_compression]" name="@mz_compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="true"/>
+    </referenceableParamGroup>
+    <referenceableParamGroup id="intensityArray">
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
+      <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of detector counts"/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="false"/>
+    </referenceableParamGroup>
+    <referenceableParamGroup id="scan1">
+      <cvParam cvRef="MS" accession="MS:1000093" name="increasing m/z scan"/>
+      <cvParam cvRef="MS" accession="MS:1000512" name="filter string" value=""/>
+    </referenceableParamGroup>
     <referenceableParamGroup id="spectrum">
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="0"/>
-      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
       @if polarity=='positive':
       <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
       @elif polarity=='negative':
       <cvParam cvRef="MS" accession="MS:1000129" name="negative scan" value=""/>
       @end
-    </referenceableParamGroup>
-    <referenceableParamGroup id="mzArray">
-      <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_compression]" name="@mz_compression" value=""/>
-    </referenceableParamGroup>
-    <referenceableParamGroup id="intensityArray">
-      <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
     </referenceableParamGroup>
   </referenceableParamGroupList>
 
