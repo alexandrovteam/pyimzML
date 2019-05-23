@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity, spec_type)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -58,9 +58,9 @@ IMZML_TEMPLATE = """\
     <referenceableParamGroup id="spectrum1">
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="0"/>
-      @if mode=='centroid':
+      @if spec_type=='centroid':
       <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum", value=""/>
-      @elif mode=='profile':
+      @elif spec_type=='profile':
       <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum", value=""/>
       @if polarity=='positive':
       <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
@@ -179,13 +179,14 @@ class ImzMLWriter(object):
             How to compress the mz array data before saving
     """
     def __init__(self, output_filename,
-                 mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
+                 mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto", spec_type="centroid",
                  mz_compression=NoCompression(), intensity_compression=NoCompression(),
                  polarity=None):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
         self.mode = mode
+        self.spec_type = spec_type
         self.mz_compression = mz_compression
         self.intensity_compression = intensity_compression
         self.run_id = os.path.splitext(output_filename)[0]
@@ -226,20 +227,25 @@ class ImzMLWriter(object):
         spectra = self.spectra
         mz_data_type = self._np_type_to_name(self.mz_dtype)
         int_data_type = self._np_type_to_name(self.intensity_dtype)
-        obo_codes = {"16-bit float": "1000520",
-                     "32-bit integer": "1000519", "32-bit float": "1000521",
-                     "64-bit integer": "1000522", "64-bit float": "1000523",
-                     "continuous": "1000030", "processed": "1000031",
-                     "zlib compression": "1000574", "no compression": "1000576"}
+        obo_codes = {"32-bit integer": "1000519", 
+                     "16-bit float": "1000520",
+                     "32-bit float": "1000521",
+                     "64-bit integer": "1000522",
+                     "64-bit float": "1000523",
+                     "continuous": "1000030",
+                     "processed": "1000031",
+                     "zlib compression": "1000574",
+                     "no compression": "1000576"}
         uuid = ("{%s}" % self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
-        mz_compression = self.mz_compression.name
-        int_compression = self.intensity_compression.name
         if self.mode == 'auto':
             mode = "processed" if len(self.lru_cache) > 1 else "continuous"
         else:
             mode = self.mode
+        spec_type = self.spec_type
+        mz_compression = self.mz_compression.name
+        int_compression = self.intensity_compression.name
         polarity = self.polarity
         self.xml.write(self.imzml_template.render(locals()))
 
