@@ -55,9 +55,13 @@ IMZML_TEMPLATE = """\
       <cvParam cvRef="MS" accession="MS:1000093" name="increasing m/z scan"/>
       <cvParam cvRef="MS" accession="MS:1000512" name="filter string" value=""/>
     </referenceableParamGroup>
-    <referenceableParamGroup id="spectrum">
+    <referenceableParamGroup id="spectrum1">
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="0"/>
+      @if mode=='centroid':
+      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum", value=""/>
+      @elif mode=='profile':
+      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum", value=""/>
       @if polarity=='positive':
       <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
       @elif polarity=='negative':
@@ -96,7 +100,7 @@ IMZML_TEMPLATE = """\
     <spectrumList count="@{len(spectra)!!s}" defaultDataProcessingRef="export_from_pyimzml">
       @for index, s in enumerate(spectra):
       <spectrum defaultArrayLength="0" id="spectrum=@{(index+1)!!s}" index="@{(index+1)!!s}">
-        <referenceableParamGroupRef ref="spectrum"/>
+        <referenceableParamGroupRef ref="spectrum1"/>
         <scanList count="1">
           <cvParam accession="MS:1000795" cvRef="MS" name="no combination"/>
           <scan instrumentConfigurationRef="instrumentConfiguration0">
