@@ -19,9 +19,12 @@ import sys
 import re
 from pathlib import Path
 
-import struct
 from warnings import warn
 import numpy as np
+
+PRECISION_DICT = {"32-bit float": 'f', "64-bit float": 'd', "32-bit integer": 'i', "64-bit integer": 'l'}
+SIZE_DICT = {'f': 4, 'd': 8, 'i': 4, 'l': 8}
+INFER_IBD_FROM_IMZML = object()
 
 param_group_elname = "referenceableParamGroup"
 data_processing_elname = "dataProcessing"
@@ -57,15 +60,19 @@ class ImzMLParser:
     ``__readimzmlmeta`` method.
     """
 
-    def __init__(self, filename, parse_lib=None):
+    def __init__(self, filename, parse_lib=None, ibd_file=INFER_IBD_FROM_IMZML):
         """
         Opens the two files corresponding to the file name, reads the entire .imzML
         file and extracts required attributes. Does not read any binary data, yet.
 
         :param filename:
             name of the XML file. Must end with .imzML. Binary data file must be named equally but ending with .ibd
+            Alternatively an open file or Buffer Protocol object can be supplied, if ibd_file is also supplied
         :param parse_lib:
             XML-parsing library to use: 'ElementTree' or 'lxml', the later will be used if argument not provided
+        :param ibd_file:
+            File or Buffer Protocol object for the .ibd file. Leave blank to infer it from the imzml filename.
+            Set to None if no data from the .ibd file is needed (getspectrum calls will not work)
         """
         # custom map sizes are currently not supported, therefore mapsize is hardcoded.
         mapsize = 0
@@ -74,9 +81,9 @@ class ImzMLParser:
         # for all imzML files, it is hard-coded here and prepended before every tag
         self.sl = "{http://psi.hupo.org/ms/mzml}"
         # maps each imzML number format to its struct equivalent
-        self.precisionDict = {"32-bit float": 'f', "64-bit float": 'd', "32-bit integer": 'i', "64-bit integer": 'l'}
+        self.precisionDict = dict(PRECISION_DICT)
         # maps each number format character to its amount of bytes used
-        self.sizeDict = {'f': 4, 'd': 8, 'i': 4, 'l': 8}
+        self.sizeDict = dict(SIZE_DICT)
         self.filename = filename
         self.mzOffsets = []
         self.intensityOffsets = []
@@ -88,9 +95,12 @@ class ImzMLParser:
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
         self.iterparse = choose_iterparse(parse_lib)
         self.__iter_read_spectrum_meta()
-        # name of the binary file
-        bin_filename = self._infer_bin_filename(self.filename)
-        self.m = open(bin_filename, "rb")
+        if ibd_file is INFER_IBD_FROM_IMZML:
+            # name of the binary file
+            ibd_filename = self._infer_bin_filename(self.filename)
+            self.m = open(ibd_filename, "rb")
+        else:
+            self.m = ibd_file
 
         # Dict for basic imzML metadata other than those required for reading
         # spectra. See method __readimzmlmeta()
@@ -110,7 +120,8 @@ class ImzMLParser:
 
     # system method for use of 'with ... as'
     def __exit__(self, exc_t, exc_v, trace):
-        self.m.close()
+        if self.m is not None:
+            self.m.close()
 
     def __iter_read_spectrum_meta(self):
         """
@@ -331,6 +342,18 @@ class ImzMLParser:
         intensity_string = self.m.read(lengths[1])
         return mz_string, intensity_string
 
+    def portable_spectrum_reader(self):
+        """
+        Builds a PortableSpectrumReader that holds the coordinates list and spectrum offsets in the .ibd file
+        so that the .ibd file can be read without opening the .imzML file again.
+
+        The PortableSpectrumReader can be safely pickled and unpickled, making it useful for reading the spectra
+        in a distributed environment such as PySpark or PyWren.
+        """
+        return PortableSpectrumReader(self.coordinates,
+                                      self.mzPrecision, self.mzOffsets, self.mzLengths,
+                                      self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
+
 
 def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
     """
@@ -476,3 +499,47 @@ class _SpectrumMetaDataBrowser(object):
                 return [spectrum_list.attrib["defaultDataProcessingRef"]]
             except KeyError as _:
                 return []
+
+
+class PortableSpectrumReader(object):
+    """
+    A pickle-able class for holding the minimal set of data required for reading,
+    without holding any references to open files that wouldn't survive pickling.
+    """
+
+    def __init__(self, coordinates, mzPrecision, mzOffsets, mzLengths,
+                 intensityPrecision, intensityOffsets, intensityLengths):
+        self.coordinates = coordinates
+        self.mzPrecision = mzPrecision
+        self.mzOffsets = mzOffsets
+        self.mzLengths = mzLengths
+        self.intensityPrecision = intensityPrecision
+        self.intensityOffsets = intensityOffsets
+        self.intensityLengths = intensityLengths
+
+    def read_spectrum_from_file(self, file, index):
+        """
+        Reads the spectrum at specified index from the .ibd file.
+
+        :param file:
+            File or file-like object for the .ibd file
+        :param index:
+            Index of the desired spectrum in the .imzML file
+
+        Output:
+
+        mz_array: numpy.ndarray
+            Sequence of m/z values representing the horizontal axis of the desired mass
+            spectrum
+        intensity_array: numpy.ndarray
+            Sequence of intensity values corresponding to mz_array
+        """
+        file.seek(self.mzOffsets[index])
+        mz_bytes = file.read(self.mzLengths[index] * SIZE_DICT[self.mzPrecision])
+        file.seek(self.intensityOffsets[index])
+        intensity_bytes = file.read(self.intensityLengths[index] * SIZE_DICT[self.intensityPrecision])
+
+        mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
+        intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
+
+        return mz_array, intensity_array
