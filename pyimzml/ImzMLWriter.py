@@ -76,6 +76,10 @@ IMZML_TEMPLATE = """\
 
   <scanSettingsList count="1">
     <scanSettings id="scanSettings1">
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[scan_direction]" name="@obo_names[scan_direction]"/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[scan_pattern]" name="@obo_names[scan_pattern]"/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[scan_type]" name="@obo_names[scan_type]"/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[line_scan_direction]" name="@obo_names[line_scan_direction]"/>
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="@{(max(s.coords[0] for s in spectra))!!s}"/>
       <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="@{(max(s.coords[1] for s in spectra))!!s}"/>
     </scanSettings>
@@ -179,6 +183,7 @@ class ImzMLWriter(object):
     """
     def __init__(self, output_filename,
                  mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto", spec_type="centroid",
+                 scan_direction="top_down", line_scan_direction="line_left_right", scan_pattern="one_way", scan_type="horizontal_line", 
                  mz_compression=NoCompression(), intensity_compression=NoCompression(),
                  polarity=None):
 
@@ -195,6 +200,11 @@ class ImzMLWriter(object):
         self.ibd = open(self.ibd_filename, 'wb+')
         self.sha1 = hashlib.sha1()
         self.uuid = uuid.uuid4()
+        
+        self.scan_direction = scan_direction
+        self.scan_pattern = scan_pattern
+        self.scan_type = scan_type
+        self.line_scan_direction = line_scan_direction
 
         self._write_ibd(self.uuid.bytes)
 
@@ -234,7 +244,34 @@ class ImzMLWriter(object):
                      "continuous": "1000030",
                      "processed": "1000031",
                      "zlib compression": "1000574",
-                     "no compression": "1000576"}
+                     "no compression": "1000576",
+                     "line_bottom_up": "1000492",
+                     "line_left_right": "1000491",
+                     "line_right_left": "1000490",
+                     "line_top_down":, "1000493",
+                     "bottom_up": "1000400",
+                     "left_right": "1000402",
+                     "right_left": "1000403",
+                     "top_down": "1000401",
+                     "meandering": "1000410",
+                     "one_way": "1000411",
+                     "random_access": "1000412",
+                     "horizontal_line": "1000480",
+                     "vertical_line": "1000481"}
+        obo_names = {"line_bottom_up": "line scan bottom up",
+                     "line_left_right": "line scan left right",
+                     "line_right_left": "line scan right left",
+                     "line_top_down":, "line scan top down",
+                     "bottom_up": "bottom up",
+                     "left_right": "left right",
+                     "right_left": "right left",
+                     "top_down": "top down",
+                     "meandering": "meandering",
+                     "one_way": "one way",
+                     "random_access": "random access",
+                     "horizontal_line": "horizontal line scan",
+                     "vertical_line": "vertical line scan"}
+        
         uuid = ("{%s}" % self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
@@ -246,6 +283,11 @@ class ImzMLWriter(object):
         mz_compression = self.mz_compression.name
         int_compression = self.intensity_compression.name
         polarity = self.polarity
+        scan_direction = self.scan_direction
+        scan_pattern = self.scan_pattern
+        scan_type = self.scan_type
+        line_scan_direction = self.line_scan_direction
+        
         self.xml.write(self.imzml_template.render(locals()))
 
     def _write_ibd(self, bytes):
