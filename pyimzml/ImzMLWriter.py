@@ -25,9 +25,9 @@ IMZML_TEMPLATE = """\
     <fileContent>
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       @if spec_type=='centroid':
-      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum", value=""/>
+      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
       @elif spec_type=='profile':
-      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum", value=""/>
+      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum" value=""/>
       @end
       <cvParam cvRef="IMS" accession="IMS:@obo_codes[mode]" name="@mode" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="@uuid"/>
@@ -56,9 +56,9 @@ IMZML_TEMPLATE = """\
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="0"/>
       @if spec_type=='centroid':
-      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum", value=""/>
+      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
       @elif spec_type=='profile':
-      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum", value=""/>
+      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum" value=""/>
       @end
       @if polarity=='positive':
       <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
@@ -248,7 +248,7 @@ class ImzMLWriter(object):
                      "line_bottom_up": "1000492",
                      "line_left_right": "1000491",
                      "line_right_left": "1000490",
-                     "line_top_down":, "1000493",
+                     "line_top_down": "1000493",
                      "bottom_up": "1000400",
                      "left_right": "1000402",
                      "right_left": "1000403",
@@ -261,7 +261,7 @@ class ImzMLWriter(object):
         obo_names = {"line_bottom_up": "line scan bottom up",
                      "line_left_right": "line scan left right",
                      "line_right_left": "line scan right left",
-                     "line_top_down":, "line scan top down",
+                     "line_top_down": "line scan top down",
                      "bottom_up": "bottom up",
                      "left_right": "left right",
                      "right_left": "right left",
