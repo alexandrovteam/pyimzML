@@ -102,6 +102,7 @@ IMZML_TEMPLATE = """\
         <scanList count="1">
           <cvParam accession="MS:1000795" cvRef="MS" name="no combination"/>
           <scan instrumentConfigurationRef="instrumentConfiguration0">
+            <referenceableParamGroupRef ref="scan1"/>
             <cvParam accession="IMS:1000050" cvRef="IMS" name="position x" value="@{s.coords[0]!!s}"/>
             <cvParam accession="IMS:1000051" cvRef="IMS" name="position y" value="@{s.coords[1]!!s}"/>
             @if len(s.coords) == 3:
