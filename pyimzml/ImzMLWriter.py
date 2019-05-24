@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, mz_compression, int_compression, polarity)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, obo_names, mz_compression, int_compression, polarity, spec_type, scan_direction, scan_pattern, scan_type, line_scan_direction)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -24,32 +24,47 @@ IMZML_TEMPLATE = """\
   <fileDescription>
     <fileContent>
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
+      @if spec_type=='centroid':
+      <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
+      @elif spec_type=='profile':
+      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum" value=""/>
+      @end
       <cvParam cvRef="IMS" accession="IMS:@obo_codes[mode]" name="@mode" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="@uuid"/>
       <cvParam cvRef="IMS" accession="IMS:1000091" name="ibd SHA-1" value="@sha1sum"/>
     </fileContent>
   </fileDescription>
 
-  <referenceableParamGroupList count="2">
-    <referenceableParamGroup id="spectrum">
+  <referenceableParamGroupList count="4">
+    <referenceableParamGroup id="mzArray">
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_compression]" name="@mz_compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="true"/>
+    </referenceableParamGroup>
+    <referenceableParamGroup id="intensityArray">
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
+      <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of detector counts"/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="true"/>
+    </referenceableParamGroup>
+    <referenceableParamGroup id="scan1">
+      <cvParam cvRef="MS" accession="MS:1000093" name="increasing m/z scan"/>
+      <cvParam cvRef="MS" accession="MS:1000512" name="filter string" value=""/>
+    </referenceableParamGroup>
+    <referenceableParamGroup id="spectrum1">
       <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum" value=""/>
       <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="0"/>
+      @if spec_type=='centroid':
       <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" value=""/>
+      @elif spec_type=='profile':
+      <cvParam cvRef="MS" accession="MS:1000128" name="profile spectrum" value=""/>
+      @end
       @if polarity=='positive':
       <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
       @elif polarity=='negative':
       <cvParam cvRef="MS" accession="MS:1000129" name="negative scan" value=""/>
       @end
-    </referenceableParamGroup>
-    <referenceableParamGroup id="mzArray">
-      <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_data_type]" name="@mz_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[mz_compression]" name="@mz_compression" value=""/>
-    </referenceableParamGroup>
-    <referenceableParamGroup id="intensityArray">
-      <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
-      <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
     </referenceableParamGroup>
   </referenceableParamGroupList>
 
@@ -61,6 +76,10 @@ IMZML_TEMPLATE = """\
 
   <scanSettingsList count="1">
     <scanSettings id="scanSettings1">
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[scan_direction]" name="@obo_names[scan_direction]"/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[scan_pattern]" name="@obo_names[scan_pattern]"/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[scan_type]" name="@obo_names[scan_type]"/>
+      <cvParam cvRef="IMS" accession="IMS:@obo_codes[line_scan_direction]" name="@obo_names[line_scan_direction]"/>
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="@{(max(s.coords[0] for s in spectra))!!s}"/>
       <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="@{(max(s.coords[1] for s in spectra))!!s}"/>
     </scanSettings>
@@ -83,20 +102,21 @@ IMZML_TEMPLATE = """\
     <spectrumList count="@{len(spectra)!!s}" defaultDataProcessingRef="export_from_pyimzml">
       @for index, s in enumerate(spectra):
       <spectrum defaultArrayLength="0" id="spectrum=@{(index+1)!!s}" index="@{(index+1)!!s}">
-        <referenceableParamGroupRef ref="spectrum"/>
+        <referenceableParamGroupRef ref="spectrum1"/>
+        <cvParam cvRef="MS" accession="MS:1000528" name="lowest observed m/z" value="@{s.mz_min!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+        <cvParam cvRef="MS" accession="MS:1000527" name="highest observed m/z" value="@{s.mz_max!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+        <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="@{s.mz_base!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
+        <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="@{s.int_base!!s}" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
+        <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="@{s.int_tic!!s}"/>
         <scanList count="1">
           <cvParam accession="MS:1000795" cvRef="MS" name="no combination"/>
           <scan instrumentConfigurationRef="instrumentConfiguration0">
+            <referenceableParamGroupRef ref="scan1"/>
             <cvParam accession="IMS:1000050" cvRef="IMS" name="position x" value="@{s.coords[0]!!s}"/>
             <cvParam accession="IMS:1000051" cvRef="IMS" name="position y" value="@{s.coords[1]!!s}"/>
             @if len(s.coords) == 3:
             <cvParam accession="IMS:1000052" cvRef="IMS" name="position z" value="@{s.coords[2]!!s}"/>
             @end
-            <cvParam cvRef="MS" accession="MS:1000528" name="lowest observed m/z" value="@{s.mz_min!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
-            <cvParam cvRef="MS" accession="MS:1000527" name="highest observed m/z" value="@{s.mz_max!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
-            <cvParam cvRef="MS" accession="MS:1000504" name="base peak m/z" value="@{s.mz_base!!s}" unitCvRef="MS" unitAccession="MS:1000040" unitName="m/z"/>
-            <cvParam cvRef="MS" accession="MS:1000505" name="base peak intensity" value="@{s.int_base!!s}" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of counts"/>
-            <cvParam cvRef="MS" accession="MS:1000285" name="total ion current" value="@{s.int_tic!!s}"/>
             @if s.userParams:
                 @for up in s.userParams:
                 <userParam name="@up['name']" value="@up['value']"/> 
@@ -162,13 +182,15 @@ class ImzMLWriter(object):
             How to compress the mz array data before saving
     """
     def __init__(self, output_filename,
-                 mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto",
+                 mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto", spec_type="centroid",
+                 scan_direction="top_down", line_scan_direction="line_left_right", scan_pattern="one_way", scan_type="horizontal_line", 
                  mz_compression=NoCompression(), intensity_compression=NoCompression(),
                  polarity=None):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
         self.mode = mode
+        self.spec_type = spec_type
         self.mz_compression = mz_compression
         self.intensity_compression = intensity_compression
         self.run_id = os.path.splitext(output_filename)[0]
@@ -178,6 +200,11 @@ class ImzMLWriter(object):
         self.ibd = open(self.ibd_filename, 'wb+')
         self.sha1 = hashlib.sha1()
         self.uuid = uuid.uuid4()
+        
+        self.scan_direction = scan_direction
+        self.scan_pattern = scan_pattern
+        self.scan_type = scan_type
+        self.line_scan_direction = line_scan_direction
 
         self._write_ibd(self.uuid.bytes)
 
@@ -209,21 +236,58 @@ class ImzMLWriter(object):
         spectra = self.spectra
         mz_data_type = self._np_type_to_name(self.mz_dtype)
         int_data_type = self._np_type_to_name(self.intensity_dtype)
-        obo_codes = {"16-bit float": "1000520",
-                     "32-bit integer": "1000519", "32-bit float": "1000521",
-                     "64-bit integer": "1000522", "64-bit float": "1000523",
-                     "continuous": "1000030", "processed": "1000031",
-                     "zlib compression": "1000574", "no compression": "1000576"}
+        obo_codes = {"32-bit integer": "1000519", 
+                     "16-bit float": "1000520",
+                     "32-bit float": "1000521",
+                     "64-bit integer": "1000522",
+                     "64-bit float": "1000523",
+                     "continuous": "1000030",
+                     "processed": "1000031",
+                     "zlib compression": "1000574",
+                     "no compression": "1000576",
+                     "line_bottom_up": "1000492",
+                     "line_left_right": "1000491",
+                     "line_right_left": "1000490",
+                     "line_top_down": "1000493",
+                     "bottom_up": "1000400",
+                     "left_right": "1000402",
+                     "right_left": "1000403",
+                     "top_down": "1000401",
+                     "meandering": "1000410",
+                     "one_way": "1000411",
+                     "random_access": "1000412",
+                     "horizontal_line": "1000480",
+                     "vertical_line": "1000481"}
+        obo_names = {"line_bottom_up": "line scan bottom up",
+                     "line_left_right": "line scan left right",
+                     "line_right_left": "line scan right left",
+                     "line_top_down": "line scan top down",
+                     "bottom_up": "bottom up",
+                     "left_right": "left right",
+                     "right_left": "right left",
+                     "top_down": "top down",
+                     "meandering": "meandering",
+                     "one_way": "one way",
+                     "random_access": "random access",
+                     "horizontal_line": "horizontal line scan",
+                     "vertical_line": "vertical line scan"}
+        
         uuid = ("{%s}" % self.uuid).upper()
         sha1sum = self.sha1.hexdigest().upper()
         run_id = self.run_id
-        mz_compression = self.mz_compression.name
-        int_compression = self.intensity_compression.name
         if self.mode == 'auto':
             mode = "processed" if len(self.lru_cache) > 1 else "continuous"
         else:
             mode = self.mode
+        spec_type = self.spec_type
+        mz_compression = self.mz_compression.name
+        int_compression = self.intensity_compression.name
         polarity = self.polarity
+        scan_direction = self.scan_direction
+        scan_pattern = self.scan_pattern
+        scan_type = self.scan_type
+        line_scan_direction = self.line_scan_direction
+        
         self.xml.write(self.imzml_template.render(locals()))
 
     def _write_ibd(self, bytes):
