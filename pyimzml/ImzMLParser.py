@@ -24,6 +24,7 @@ import numpy as np
 
 PRECISION_DICT = {"32-bit float": 'f', "64-bit float": 'd', "32-bit integer": 'i', "64-bit integer": 'l'}
 SIZE_DICT = {'f': 4, 'd': 8, 'i': 4, 'l': 8}
+INFER_IBD_FROM_IMZML = object()
 
 param_group_elname = "referenceableParamGroup"
 data_processing_elname = "dataProcessing"
@@ -43,9 +44,6 @@ def choose_iterparse(parse_lib=None):
     return iterparse
 
 
-def infer_ibd_from_imzml():
-    pass
-
 class ImzMLParser:
     """
     Parser for imzML 1.1.0 files (see specification here:
@@ -62,7 +60,7 @@ class ImzMLParser:
     ``__readimzmlmeta`` method.
     """
 
-    def __init__(self, filename, parse_lib=None, ibd_file=infer_ibd_from_imzml):
+    def __init__(self, filename, parse_lib=None, ibd_file=INFER_IBD_FROM_IMZML):
         """
         Opens the two files corresponding to the file name, reads the entire .imzML
         file and extracts required attributes. Does not read any binary data, yet.
@@ -97,7 +95,7 @@ class ImzMLParser:
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
         self.iterparse = choose_iterparse(parse_lib)
         self.__iter_read_spectrum_meta()
-        if ibd_file is infer_ibd_from_imzml:
+        if ibd_file is INFER_IBD_FROM_IMZML:
             # name of the binary file
             ibd_filename = self._infer_bin_filename(self.filename)
             self.m = open(ibd_filename, "rb")
