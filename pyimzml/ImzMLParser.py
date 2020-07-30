@@ -22,9 +22,13 @@ from pathlib import Path
 from warnings import warn
 import numpy as np
 
+from pyimzml.metadata import Metadata, SpectrumData
+from pyimzml.ontology.ontology import convert_cv_param
+
 PRECISION_DICT = {"32-bit float": 'f', "64-bit float": 'd', "32-bit integer": 'i', "64-bit integer": 'l'}
 SIZE_DICT = {'f': 4, 'd': 8, 'i': 4, 'l': 8}
 INFER_IBD_FROM_IMZML = object()
+XMLNS_PREFIX = "{http://psi.hupo.org/ms/mzml}"
 
 param_group_elname = "referenceableParamGroup"
 data_processing_elname = "dataProcessing"
@@ -44,6 +48,15 @@ def choose_iterparse(parse_lib=None):
     return iterparse
 
 
+def _get_cv_param(elem, accession, deep=False, convert=False):
+    base = './/' if deep else ''
+    node = elem.find('%s%scvParam[@accession="%s"]' % (base, XMLNS_PREFIX, accession))
+    if node is not None:
+        if convert:
+            return convert_cv_param(accession, node.get('value'))
+        return node.get('value')
+
+
 class ImzMLParser:
     """
     Parser for imzML 1.1.0 files (see specification here:
@@ -55,12 +68,18 @@ class ImzMLParser:
     respective index. Coordinates are always 3-dimensional. If the third spatial dimension is not present in
     the data, it will be set to zero.
 
-    *pyimzML* has limited support for the metadata embedded in the imzML file. For some general metadata, you can use
-    the parser's ``ìmzmldict`` attribute. You can find the exact list of supported metadata in the documentation of the
-    ``__readimzmlmeta`` method.
+    The global metadata fields in the imzML file are stored in parser.metadata.
+    Spectrum-specific metadata fields are not stored by default due to avoid memory issues,
+    use the `include_spectra_metadata` parameter if spectrum-specific metadata is needed.
     """
 
-    def __init__(self, filename, parse_lib=None, ibd_file=INFER_IBD_FROM_IMZML):
+    def __init__(
+            self,
+            filename,
+            parse_lib=None,
+            ibd_file=INFER_IBD_FROM_IMZML,
+            include_spectra_metadata=None,
+    ):
         """
         Opens the two files corresponding to the file name, reads the entire .imzML
         file and extracts required attributes. Does not read any binary data, yet.
@@ -73,9 +92,16 @@ class ImzMLParser:
         :param ibd_file:
             File or Buffer Protocol object for the .ibd file. Leave blank to infer it from the imzml filename.
             Set to None if no data from the .ibd file is needed (getspectrum calls will not work)
+        :param include_spectra_metadata:
+            None, 'full', or a list/set of accession IDs.
+            If 'full' is given, parser.spectrum_full_metadata will be populated with a list of
+                complex objects containing the full metadata for each spectrum.
+            If a list or set is given, parser.spectrum_metadata_fields will be populated with a dict mapping
+                accession IDs to lists. Each list will contain the values for that accession ID for
+                each spectrum. Note that for performance reasons, this mode only searches the
+                spectrum itself for the value. It won't check any referenced referenceable param
+                groups if the accession ID isn't present in the spectrum metadata.
         """
-        # custom map sizes are currently not supported, therefore mapsize is hardcoded.
-        mapsize = 0
         # ElementTree requires the schema location for finding tags (why?) but
         # fails to read it from the root element. As this should be identical
         # for all imzML files, it is hard-coded here and prepended before every tag
@@ -92,9 +118,18 @@ class ImzMLParser:
         # list of all (x,y,z) coordinates as tuples.
         self.coordinates = []
         self.root = None
+        self.metadata = None
+        if include_spectra_metadata == 'full':
+            self.spectrum_full_metadata = []
+        elif include_spectra_metadata is not None:
+            include_spectra_metadata = set(include_spectra_metadata)
+            self.spectrum_metadata_fields = {
+                k: [] for k in include_spectra_metadata
+            }
+
         self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
         self.iterparse = choose_iterparse(parse_lib)
-        self.__iter_read_spectrum_meta()
+        self.__iter_read_spectrum_meta(include_spectra_metadata)
         if ibd_file is INFER_IBD_FROM_IMZML:
             # name of the binary file
             ibd_filename = self._infer_bin_filename(self.filename)
@@ -123,7 +158,7 @@ class ImzMLParser:
         if self.m is not None:
             self.m.close()
 
-    def __iter_read_spectrum_meta(self):
+    def __iter_read_spectrum_meta(self, include_spectra_metadata):
         """
         This method should only be called by __init__. Reads the data formats, coordinates and offsets from
         the .imzML file and initializes the respective attributes. While traversing the XML tree, the per-spectrum
@@ -143,19 +178,11 @@ class ImzMLParser:
 
         for event, elem in elem_iterator:
             if elem.tag == self.sl + "spectrumList" and event == "start":
+                self.__process_metadata()
                 slist = elem
             elif elem.tag == self.sl + "spectrum" and event == "end":
-                self.__process_spectrum(elem)
+                self.__process_spectrum(elem, include_spectra_metadata)
                 slist.remove(elem)
-            elif elem.tag == self.sl + "referenceableParamGroup" and event == "end":
-                for param in elem:
-                    if param.attrib["name"] == "m/z array":
-                        self.mzGroupId = elem.attrib['id']
-                        mz_group = elem
-                    elif param.attrib["name"] == "intensity array":
-                        self.intGroupId = elem.attrib['id']
-                        int_group = elem
-        self.__assign_precision(int_group, mz_group)
         self.__fix_offsets()
 
     def __fix_offsets(self):
@@ -174,61 +201,64 @@ class ImzMLParser:
         self.mzOffsets = fix(self.mzOffsets)
         self.intensityOffsets = fix(self.intensityOffsets)
 
-    def __assign_precision(self, int_group, mz_group):
-        valid_accession_strings = ("MS:1000521", "MS:1000523", "IMS:1000141", "IMS:1000142", "MS:1000519", "MS:1000522")
-        mz_precision = int_precision = None
-        for s in valid_accession_strings:
-            param = mz_group.find('%scvParam[@accession="%s"]' % (self.sl, s))
-            if param is not None:
-                mz_precision = self.precisionDict[param.attrib["name"]]
-                break
-        for s in valid_accession_strings:
-            param = int_group.find('%scvParam[@accession="%s"]' % (self.sl, s))
-            if param is not None:
-                int_precision = self.precisionDict[param.attrib["name"]]
-                break
-        if (mz_precision is None) or (int_precision is None):
-            raise RuntimeError("Unsupported number format: mz = %s, int = %s" % (mz_precision, int_precision))
-        self.mzPrecision, self.intensityPrecision = mz_precision, int_precision
+    def __process_metadata(self):
+        if self.metadata is None:
+            self.metadata = Metadata(self.root)
+            for id, param_group in self.metadata.referenceable_param_groups.items():
+                if 'm/z array' in param_group.param_by_name:
+                    self.mzGroupId = id
+                    for name, dtype in self.precisionDict.items():
+                        if name in param_group.param_by_name:
+                            self.mzPrecision = dtype
+                if 'intensity array' in param_group.param_by_name:
+                    self.intGroupId = id
+                    for name, dtype in self.precisionDict.items():
+                        if name in param_group.param_by_name:
+                            self.intensityPrecision = dtype
+            if not hasattr(self, 'mzPrecision'):
+                raise RuntimeError("Could not determine m/z precision")
+            if not hasattr(self, 'intensityPrecision'):
+                raise RuntimeError("Could not determine intensity precision")
 
-    def __process_spectrum(self, elem):
+    def __process_spectrum(self, elem, include_spectra_metadata):
         arrlistelem = elem.find('%sbinaryDataArrayList' % self.sl)
-        elist = list(arrlistelem)
-        elist_sorted = [None, None]
-        for e in elist:
+        mz_group = None
+        int_group = None
+        for e in arrlistelem:
             ref = e.find('%sreferenceableParamGroupRef' % self.sl).attrib["ref"]
             if ref == self.mzGroupId:
-                elist_sorted[0] = e
+                mz_group = e
             elif ref == self.intGroupId:
-                elist_sorted[1] = e
-        mz_offset_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
-        self.mzOffsets.append(int(mz_offset_elem.attrib["value"]))
-        mz_length_elem = elist_sorted[0].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
-        self.mzLengths.append(int(mz_length_elem.attrib["value"]))
-        intensity_offset_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000102"]' % self.sl)
-        self.intensityOffsets.append(int(intensity_offset_elem.attrib["value"]))
-        intensity_length_elem = elist_sorted[1].find('%scvParam[@accession="IMS:1000103"]' % self.sl)
-        self.intensityLengths.append(int(intensity_length_elem.attrib["value"]))
+                int_group = e
+        self.mzOffsets.append(int(_get_cv_param(mz_group, 'IMS:1000102')))
+        self.mzLengths.append(int(_get_cv_param(mz_group, 'IMS:1000103')))
+        self.intensityOffsets.append(int(_get_cv_param(int_group, 'IMS:1000102')))
+        self.intensityLengths.append(int(_get_cv_param(int_group, 'IMS:1000103')))
         scan_elem = elem.find('%sscanList/%sscan' % (self.sl, self.sl))
-        x = scan_elem.find('%scvParam[@accession="IMS:1000050"]' % self.sl).attrib["value"]
-        y = scan_elem.find('%scvParam[@accession="IMS:1000051"]' % self.sl).attrib["value"]
-        try:
-            z = scan_elem.find('%scvParam[@accession="IMS:1000052"]' % self.sl).attrib["value"]
+        x = _get_cv_param(scan_elem, 'IMS:1000050')
+        y = _get_cv_param(scan_elem, 'IMS:1000051')
+        z = _get_cv_param(scan_elem, 'IMS:1000052')
+        if z is not None:
             self.coordinates.append((int(x), int(y), int(z)))
-        except AttributeError:
+        else:
             self.coordinates.append((int(x), int(y), 1))
+
+        if include_spectra_metadata == 'full':
+            self.spectrum_full_metadata.append(
+                SpectrumData(elem, self.metadata.referenceable_param_groups)
+            )
+        elif include_spectra_metadata:
+            for param in include_spectra_metadata:
+                value = _get_cv_param(elem, param, deep=True, convert=True)
+                self.spectrum_metadata_fields[param].append(value)
 
     def __readimzmlmeta(self):
         """
+        DEPRECATED - use self.metadata instead, as it has much greater detail and allows for
+        multiple scan settings / instruments.
+
         This method should only be called by __init__. Initializes the imzmldict with frequently used metadata from
         the .imzML file.
-
-        This method reads only a subset of the available meta information and may be extended in the future. The keys
-        are named similarly to the imzML names. Currently supported keys: "max dimension x", "max dimension y",
-        "pixel size x", "pixel size y", "matrix solution concentration", "wavelength", "focus diameter x",
-        "focus diameter y", "pulse energy", "pulse duration", "attenuation".
-
-        If a key is not found in the XML tree, it will not be in the dict either.
 
         :return d:
             dict containing above mentioned meta data
@@ -240,36 +270,37 @@ class ImzMLParser:
         d = {}
         scan_settings_list_elem = self.root.find('%sscanSettingsList' % self.sl)
         instrument_config_list_elem = self.root.find('%sinstrumentConfigurationList' % self.sl)
-        supportedparams1 = [("max count of pixels x", int), ("max count of pixels y", int),
-                            ("max dimension x", int), ("max dimension y", int), ("pixel size x", float),
-                            ("pixel size y", float), ("matrix solution concentration", float)]
-        supportedparams2 = [("wavelength", float),
-                            ("focus diameter x", float), ("focus diameter y", float), ("pulse energy", float),
-                            ("pulse duration", float), ("attenuation", float)]
-        supportedaccessions1 = [("IMS:1000042", "value"), ("IMS:1000043", "value"),
-                                ("IMS:1000044", "value"), ("IMS:1000045", "value"),
-                                ("IMS:1000046", "value"), ("IMS:1000047", "value"), ("MS:1000835", "value")]
-        supportedaccessions2 = [("MS:1000843", "value"), ("MS:1000844", "value"),
-                                ("MS:1000845", "value"), ("MS:1000846", "value"), ("MS:1000847", "value"),
-                                ("MS:1000848", "value")]
-        for i in range(len(supportedparams1)):
-            acc, attr = supportedaccessions1[i]
-            elem = scan_settings_list_elem.find('.//%scvParam[@accession="%s"]' % (self.sl, acc))
-            if elem is None:
-                break
-            name, T = supportedparams1[i]
+        scan_settings_params = [
+            ("max count of pixels x", "IMS:1000042"),
+            ("max count of pixels y", "IMS:1000043"),
+            ("max dimension x", "IMS:1000044"),
+            ("max dimension y", "IMS:1000045"),
+            ("pixel size x", "IMS:1000046"),
+            ("pixel size y", "IMS:1000047"),
+            ("matrix solution concentration", "MS:1000835"),
+        ]
+        instrument_config_params = [
+            ("wavelength", "MS:1000843"),
+            ("focus diameter x", "MS:1000844"),
+            ("focus diameter y", "MS:1000845"),
+            ("pulse energy", "MS:1000846"),
+            ("pulse duration", "MS:1000847"),
+            ("attenuation", "MS:1000848"),
+        ]
+
+        for name, accession in scan_settings_params:
             try:
-                d[name] = T(elem.attrib[attr])
+                val = _get_cv_param(scan_settings_list_elem, accession, deep=True, convert=True)
+                if val is not None:
+                    d[name] = val
             except ValueError:
                 warn(Warning('Wrong data type in XML file. Skipped attribute "%s"' % name))
-        for i in range(len(supportedparams2)):
-            acc, attr = supportedaccessions2[i]
-            elem = instrument_config_list_elem.find('.//%scvParam[@accession="%s"]' % (self.sl, acc))
-            if elem is None:
-                break
-            name, T = supportedparams2[i]
+
+        for name, accession in instrument_config_params:
             try:
-                d[name] = T(elem.attrib[attr])
+                val = _get_cv_param(instrument_config_list_elem, accession, deep=True, convert=True)
+                if val is not None:
+                    d[name] = val
             except ValueError:
                 warn(Warning('Wrong data type in XML file. Skipped attribute "%s"' % name))
         return d
