@@ -121,10 +121,9 @@ class ParamGroup:
             )
 
         # Mapping of CV param name to parsed value
-        self.param_by_name = {
-            **{param[0]: param[2] for param in self.user_params},
-            **{param[0]: param[2] for param in self.cv_params},
-        }
+        self.param_by_name = {}
+        self.param_by_name.update((param[0], param[2]) for param in self.user_params)
+        self.param_by_name.update((param[0], param[2]) for param in self.cv_params)
         # Mapping of CV param accession to parsed value
         self.param_by_accession = {
             param[1]: param[2] for param in self.cv_params
@@ -175,12 +174,14 @@ class ParamGroup:
                 return {k: deep_pretty(v) for k, v in obj.items()}
             return obj
 
-        return {
+        result = {
             'type': self.type,
-            **self.attrs,
-            **self.param_by_name,
-            **deep_pretty(self.extra_fields)
         }
+        result.update(self.attrs)
+        result.update(self.param_by_name)
+        result.update(deep_pretty(self.extra_fields))
+
+        return result
 
 
 class SpectrumData(ParamGroup):

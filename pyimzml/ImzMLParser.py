@@ -204,14 +204,14 @@ class ImzMLParser:
     def __process_metadata(self):
         if self.metadata is None:
             self.metadata = Metadata(self.root)
-            for id, param_group in self.metadata.referenceable_param_groups.items():
+            for param_id, param_group in self.metadata.referenceable_param_groups.items():
                 if 'm/z array' in param_group.param_by_name:
-                    self.mzGroupId = id
+                    self.mzGroupId = param_id
                     for name, dtype in self.precisionDict.items():
                         if name in param_group.param_by_name:
                             self.mzPrecision = dtype
                 if 'intensity array' in param_group.param_by_name:
-                    self.intGroupId = id
+                    self.intGroupId = param_id
                     for name, dtype in self.precisionDict.items():
                         if name in param_group.param_by_name:
                             self.intensityPrecision = dtype

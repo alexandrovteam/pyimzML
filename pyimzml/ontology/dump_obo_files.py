@@ -7,7 +7,6 @@ from collections import defaultdict
 from datetime import datetime
 from pprint import pformat
 
-import obonet
 
 ontology_sources = [
     ('ms', 'https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo', ['MS']),
@@ -16,6 +15,8 @@ ontology_sources = [
 ]
 
 if __name__ == '__main__':
+    import obonet
+
     now = datetime.utcnow().isoformat()
 
     for ontology_name, src, namespaces in ontology_sources:
@@ -23,9 +24,9 @@ if __name__ == '__main__':
         graph = obonet.read_obo(src)
         terms = {}
         enums = defaultdict(list)
-        for id in graph.nodes:
-            node = graph.nodes[id]
-            if any(id.startswith(ns) for ns in namespaces) and 'name' in node:
+        for node_id in graph.nodes:
+            node = graph.nodes[node_id]
+            if any(node_id.startswith(ns) for ns in namespaces) and 'name' in node:
                 dtype = None
                 for xref in node.get('xref', []):
                     m = re.match(r'^value-type:xsd\\:(\w+) ', xref)
@@ -33,7 +34,7 @@ if __name__ == '__main__':
                         dtype = 'xsd:' + m[1]
                         break
 
-                terms[id] = (node['name'], dtype)
+                terms[node_id] = (node['name'], dtype)
 
         with open(f'./{ontology_name}.py', 'wt') as f:
             f.write('# DO NOT EDIT BY HAND\n')

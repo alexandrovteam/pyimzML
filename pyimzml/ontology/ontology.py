@@ -4,7 +4,10 @@ from .uo import terms as uo_terms
 from .ms import terms as ms_terms
 from .ims import terms as ims_terms
 
-all_terms = {**uo_terms, **ms_terms, **ims_terms}
+all_terms = {}
+all_terms.update(uo_terms)
+all_terms.update(ms_terms)
+all_terms.update(ims_terms)
 
 DTYPE_MAPPING = {
     'xsd:string': str,
