@@ -49,7 +49,8 @@ class Metadata:
     def __init__(self, root):
         """
         Parse metadata headers from an imzML file into a structured format for easy access in Python code.
-        This class deliberately excludes spectra, as they
+        This class deliberately excludes spectra, as they account for significantly more memory use
+        and parsing time, and typically should be treated separately.
         """
         pu = _ParseUtils()
 
