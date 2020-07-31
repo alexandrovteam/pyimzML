@@ -4,6 +4,17 @@ from pyimzml.ontology.ontology import lookup_and_convert_cv_param, convert_xml_v
 
 XMLNS_PREFIX = "{http://psi.hupo.org/ms/mzml}"
 
+
+def _deep_pretty(obj):
+    if isinstance(obj, list):
+        return [_deep_pretty(item) for item in obj]
+    if isinstance(obj, dict):
+        return {k: _deep_pretty(v) for k, v in obj.items()}
+    if hasattr(obj, 'pretty'):
+        return obj.pretty()
+    return obj
+
+
 class _ParseUtils:
     """
     Utility class for common parsing patterns and tracking created param groups so that
@@ -23,7 +34,7 @@ class _ParseUtils:
 
     def param_groups_by_id(self, parent_node, xpath):
         return dict(
-            (n.attrib.get('id', idx), self.param_group(n))
+            (n.get('id', idx), self.param_group(n))
             for idx, n in enumerate(parent_node.findall(xpath.format(XMLNS_PREFIX)))
         )
 
@@ -36,6 +47,10 @@ class _ParseUtils:
 
 class Metadata:
     def __init__(self, root):
+        """
+        Parse metadata headers from an imzML file into a structured format for easy access in Python code.
+        This class deliberately excludes spectra, as they
+        """
         pu = _ParseUtils()
 
         fd_node = root.find('{0}fileDescription'.format(XMLNS_PREFIX))
@@ -54,7 +69,7 @@ class Metadata:
 
         self.scan_settings = {}
         for node in root.findall('{0}scanSettingsList/{0}scanSettings'.format(XMLNS_PREFIX)):
-            self.scan_settings[node.attrib.get('id')] = pu.param_group(
+            self.scan_settings[node.get('id')] = pu.param_group(
                 node,
                 source_file_refs=pu.refs_list(node, '{0}sourceFileRefList/{0}sourceFileRef'),
                 targets=pu.param_groups_by_id(node, '{0}targetList/{0}target'),
@@ -62,7 +77,7 @@ class Metadata:
 
         self.instrument_configurations = {}
         for node in root.findall('{0}instrumentConfigurationList/{0}instrumentConfiguration'.format(XMLNS_PREFIX)):
-            self.instrument_configurations[node.attrib.get('id')] = pu.param_group(
+            self.instrument_configurations[node.get('id')] = pu.param_group(
                 node,
                 components=pu.param_groups_list(node, '{0}componentList/*'),
                 software_ref=next(iter(pu.refs_list(node, '{0}softwareRef')), None),
@@ -70,7 +85,7 @@ class Metadata:
 
         self.data_processings = {}
         for node in root.findall('{0}dataProcessingList/{0}dataProcessing'.format(XMLNS_PREFIX)):
-            self.data_processings[node.attrib.get('id')] = pu.param_group(
+            self.data_processings[node.get('id')] = pu.param_group(
                 node,
                 methods=pu.param_groups_list(node, '{0}processingMethod')
             )
@@ -79,16 +94,53 @@ class Metadata:
         for pg in pu.created_param_groups:
             pg.apply_referenceable_param_groups(self.referenceable_param_groups)
 
+    def pretty(self):
+        """
+        Returns a nested dict summarizing all contained sections, intended to help human inspection.
+        """
+        return {
+            'file_description': self.file_description.pretty(),
+            'referenceable_param_groups': _deep_pretty(self.referenceable_param_groups),
+            'samples': _deep_pretty(self.samples),
+            'softwares': _deep_pretty(self.softwares),
+            'scan_settings': _deep_pretty(self.scan_settings),
+            'instrument_configurations': _deep_pretty(self.instrument_configurations),
+            'data_processings': _deep_pretty(self.data_processings),
+        }
+
 
 class ParamGroup:
-    def __init__(self, elem, **extra_attrs):
+    """
+        This class exposes a group of imzML parameters at two layers of abstraction:
+
+        High-level examples:
+        `param_group['MS:0000000']`
+            Access a controlled vocabulary parameter by accession ID or name, or a user-defined
+            parameter by name. Controlled vocabulary parameters will take priority.
+            This also inherits values from referenced referenceable param groups.
+        `'particle beam' in param_group`
+            Check if a parameter exists by name / accession ID.
+        `param_group.targets`
+            Access a subelement directly by name.
+
+        Low-level examples:
+        `param_group.cv_params` - A list of all cvParams defined in this group. Includes raw values,
+                                  units, and multiple items if one accession is used multiple times.
+                                  Does not include values inherited from referenceable param groups.
+        `param_group.user_params` - A list of all userParams.
+        `param_group.attrs` - A dict of all XML attributes.
+        `param_group.subelements` - A dict of all subelements.
+
+
+    """
+    def __init__(self, elem, **extra_data):
         """
         Parses an XML element representing a group of controlled vocabulary parameters.
 
-        :param elem:              an XML element containing cvParam children
-        :param extra_attrs:       extra attributes to assign to the class instance
+        :param elem:             an XML element containing cvParam children
+        :param extra_data:       extra attributes to assign to the class instance
         """
-        self._param_group_refs = [
+        self.param_group_refs = [
             ref.get('ref')
             for ref in elem.findall('{0}referenceableParamGroupRef'.format(XMLNS_PREFIX))
         ]
@@ -99,9 +151,9 @@ class ParamGroup:
         # in the same block
         self.cv_params = []
         for node in elem.findall('{0}cvParam'.format(XMLNS_PREFIX)):
-            accession = node.attrib.get('accession')
-            raw_value = node.attrib.get('value')
-            unit_accession = node.attrib.get('unitAccession')
+            accession = node.get('accession')
+            raw_value = node.get('value')
+            unit_accession = node.get('unitAccession')
             name, parsed_value, unit_name = lookup_and_convert_cv_param(accession, raw_value, unit_accession)
             self.cv_params.append(
                 (name, accession, parsed_value, raw_value, unit_name, unit_accession)
@@ -110,11 +162,11 @@ class ParamGroup:
         # Tuples of (name, type, parsed_value, raw_value, unit_name, unit_accession)
         self.user_params = []
         for node in elem.findall('{0}userParam'.format(XMLNS_PREFIX)):
-            name = node.attrib.get('name')
-            dtype = node.attrib.get('dtype')
-            raw_value = node.attrib.get('value')
+            name = node.get('name')
+            dtype = node.get('dtype')
+            raw_value = node.get('value')
             parsed_value = convert_xml_value(raw_value, dtype)
-            unit_accession = node.attrib.get('unitAccession')
+            unit_accession = node.get('unitAccession')
             unit_name = convert_term_name(unit_accession)
             self.user_params.append(
                 (name, dtype, parsed_value, raw_value, unit_name, unit_accession)
@@ -131,8 +183,8 @@ class ParamGroup:
 
         self.attrs = elem.attrib
 
-        self.extra_fields = extra_attrs
-        for k, v in extra_attrs.items():
+        self.subelements = extra_data
+        for k, v in extra_data.items():
             setattr(self, k, v)
 
     def __getitem__(self, key):
@@ -145,15 +197,15 @@ class ParamGroup:
         return key in self.param_by_accession or key in self.param_by_name
 
     def apply_referenceable_param_groups(self, rpgs):
-        for ref in self._param_group_refs[::-1]:
+        for ref in self.param_group_refs[::-1]:
             rpg = rpgs.get(ref)
             if rpg:
-                self.cv_params = rpg.cv_params + self.cv_params
-
                 for name, accession, parsed_value, *_ in rpg.cv_params:
                     if name is not None and name != accession:
                         self.param_by_name.setdefault(name, parsed_value)
                     self.param_by_accession.setdefault(accession, parsed_value)
+                for name, _, parsed_value, *_ in rpg.user_params:
+                    self.param_by_name.setdefault(name, parsed_value)
             else:
                 warn('ReferenceableParamGroup "%s" not found' % ref)
 
@@ -162,24 +214,13 @@ class ParamGroup:
         Flattens attributes, params and extra fields into a single dict keyed by name.
         This function is intended to help human inspection. For programmatic access to specific fields,
         always use the `attrs`, `param_by_name`, `param_by_accession`, etc. instance attributes instead.
-
-        :return:
         """
-        def deep_pretty(obj):
-            if isinstance(obj, ParamGroup):
-                return obj.pretty()
-            if isinstance(obj, list):
-                return [deep_pretty(item) for item in obj]
-            if isinstance(obj, dict):
-                return {k: deep_pretty(v) for k, v in obj.items()}
-            return obj
-
         result = {
             'type': self.type,
         }
         result.update(self.attrs)
         result.update(self.param_by_name)
-        result.update(deep_pretty(self.extra_fields))
+        result.update(_deep_pretty(self.subelements))
 
         return result
 
