@@ -1,7 +1,7 @@
 # This file is not intended for general use. Its purpose is to dump the .obo files that define
 # the cvParam accession fields into a dependency-free format that can be bundled with pyimzml.
 #
-# It requires the additonal pip dependency obonet==0.2.5
+# It requires the additonal pip dependency obonet==0.2.6
 import re
 from collections import defaultdict
 from datetime import datetime
@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     for ontology_name, src, namespaces in ontology_sources:
         print(f'Parsing {ontology_name}')
-        graph = obonet.read_obo(src)
+        graph = obonet.read_obo(src, ignore_obsolete=False)
         terms = {}
         enums = defaultdict(list)
         for node_id in graph.nodes:
