@@ -1,4 +1,5 @@
 from datetime import datetime
+from warnings import warn
 
 from .uo import terms as uo_terms
 from .ms import terms as ms_terms
@@ -22,6 +23,11 @@ DTYPE_MAPPING = {
     'xsd:nonNegativeInteger': int,
     'xsd:boolean': bool,
     'xsd:dateTime': datetime,
+}
+
+FLOAT_TYPE_FIX_MAPPING = {
+'32-bit float': 'MS:1000521',
+'64-bit float': 'MS:1000523',
 }
 
 
@@ -54,15 +60,35 @@ def convert_cv_param(accession, value):
     return converted_value
 
 
-def lookup_and_convert_cv_param(accession, value, unit_accession=None):
+def lookup_and_convert_cv_param(accession, raw_name, value, unit_accession=None):
     """
     Looks up a term by accession number, and returns the term name, its value converted into
     the expected datatype, and the unit name (if a unit accession number is also given).
     """
-    name, dtype = all_terms.get(accession, (accession, None))
+    name, dtype = all_terms.get(accession, (raw_name or accession, None))
     converted_value = convert_xml_value(dtype, value)
     unit_name = all_terms.get(unit_accession, (unit_accession, None))[0]
-    return name, converted_value, unit_name
+
+    if accession not in all_terms:
+        warn('Unrecognized accession in <cvParam>: %s (name: "%s").' % (accession, raw_name))
+    elif name != raw_name:
+        #
+        if accession in FLOAT_TYPE_FIX_MAPPING.values() and name in FLOAT_TYPE_FIX_MAPPING:
+            fixed_accession = FLOAT_TYPE_FIX_MAPPING[raw_name]
+            warn(
+                'Accession %s found with incorrect name "%s" (expected "%s"). '
+                'This is a known issue with some imzML conversion software - updating accession '
+                'to %s.' % (accession, raw_name, name, fixed_accession)
+            )
+            accession = fixed_accession
+            name = raw_name
+        else:
+            warn(
+                'Accession %s found with incorrect name "%s". Updating name to "%s".'
+                % (accession, raw_name, name)
+            )
+
+    return accession, name, converted_value, unit_name
 
 
 

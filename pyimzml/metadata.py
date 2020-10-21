@@ -153,11 +153,14 @@ class ParamGroup:
         self.cv_params = []
         for node in elem.findall('{0}cvParam'.format(XMLNS_PREFIX)):
             accession = node.get('accession')
+            raw_name = node.get('name')
             raw_value = node.get('value')
             unit_accession = node.get('unitAccession')
-            name, parsed_value, unit_name = lookup_and_convert_cv_param(accession, raw_value, unit_accession)
+            accession, name, parsed_value, unit_name = lookup_and_convert_cv_param(
+                accession, raw_name, raw_value, unit_accession
+            )
             self.cv_params.append(
-                (name, accession, parsed_value, raw_value, unit_name, unit_accession)
+                (name, accession, parsed_value, raw_name, raw_value, unit_name, unit_accession)
             )
 
         # Tuples of (name, type, parsed_value, raw_value, unit_name, unit_accession)
