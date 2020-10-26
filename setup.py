@@ -1,5 +1,5 @@
 from pyimzml import __version__
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='pyimzML',
@@ -35,8 +35,7 @@ Python 3.3 or newer is recommended for performance reasons.""",
     ],
     keywords='bioinformatics imaging mass spectrometry parser imzML',
 
-    # packages=find_packages(),
-    packages=['pyimzml'],
+    packages=find_packages(exclude=('tests', 'docs')),
 
-    install_requires=['numpy','wheezy.template'],
+    install_requires=['numpy', 'wheezy.template'],
 )
