@@ -35,7 +35,7 @@ Python 3.3 or newer is recommended for performance reasons.""",
     ],
     keywords='bioinformatics imaging mass spectrometry parser imzML',
 
-    packages=find_packages(where='.', exclude=('tests',)),
+    packages=find_packages(exclude=('tests', 'docs')),
 
     install_requires=['numpy', 'wheezy.template'],
 )
