@@ -13,9 +13,6 @@ Designed for use with imzML version 1.1.0. Outputs data as python lists and dict
 
 The parser is developed by `Alexandrov Team <http://www.embl.de/research/units/scb/alexandrov/index.html>`_ at EMBL Heidelberg.
 
-* Developer: Dominik Fay
-* Contact and feedback: `Team contact <http://www.embl.de/research/units/scb/alexandrov/contact/index.html>`_
-
 Installation
 ------------
 pyimzML is available on `PyPI <https://pypi.python.org/pypi/pyimzML>`_. pyimzML
@@ -31,9 +28,18 @@ should be installed with pip using one of these three options:
 
 **Testing**
 
-To test your installation of pyimzML, you can download sample data from `imzml.org <http://imzml.org/index.php?option=com_content&view=article&id=186&Itemid=68>`_ and go through the following use cases.
+To test your installation of pyimzML, you can download sample data from `imzml.org <http://imzml.org/index.php?option=com_content&view=article&id=186&Itemid=68>`_ and run the tests.
+
+Attribution
+-----------
+
+The pyimzml/ontology directory includes data derived from the following ontologies:
+
+* `Units of measurement ontology <http://www.obofoundry.org/ontology/uo.html>`_ by George Gkoutos `CC-BY license <https://creativecommons.org/licenses/by/3.0/>`_
+* `Mass spectrometry ontology <http://www.obofoundry.org/ontology/ms.html>`_ by `Gerhard Mayer et al. <https://pubmed.ncbi.nlm.nih.gov/23482073/>`_ `CC-BY license <https://creativecommons.org/licenses/by/3.0/>`_
+* `Imaging MS controlled vocabulary <https://ms-imaging.org/wp/imzml/controlled-vocabulary/>`_
 
 Documentation
 -------------
 
-Documentation is available on `ReadTheDocs <http://pyimzml.readthedocs.org/en/latest/?badge=latest>`
+Documentation is available on `ReadTheDocs <http://pyimzml.readthedocs.org/en/latest/?badge=latest>`_
