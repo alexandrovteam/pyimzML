@@ -20,10 +20,7 @@ import sphinx_rtd_theme
 sys.path.append('..')
 sys.path.append('../..')
 
-import rtd_gen_docs  # noqa
 from pyimzml import __version__  # noqa
-
-rtd_gen_docs.main()
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -156,7 +153,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+# html_static_path = ['_static']
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied

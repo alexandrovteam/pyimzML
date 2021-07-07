@@ -16,7 +16,7 @@ Typical usage pattern is as follows:
 
     from pyimzml.ImzMLWriter import ImzMLWriter
 
-    with ImzMLWriter('output.imzML') as w:
+    with ImzMLWriter('output.imzML', polarity='positive') as w:
         for mzs, intensities, coords in my_spectra:
             # writes data to the .ibd file
             writer.addSpectrum(mzs, intensities, coords)
@@ -38,4 +38,4 @@ API Reference
 
 :ref:`modindex`
 
-.. autosummary::
+

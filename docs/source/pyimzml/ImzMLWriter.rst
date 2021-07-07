@@ -10,7 +10,6 @@ pyimzml.ImzMLWriter module
 .. automodule:: pyimzml.ImzMLWriter
     :members:
     :undoc-members:
-    :special-members: __enter__,__exit__
 
 
 pyimzml.compression module
