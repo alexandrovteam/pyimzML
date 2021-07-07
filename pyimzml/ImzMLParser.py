@@ -41,10 +41,7 @@ def choose_iterparse(parse_lib=None):
     elif parse_lib == 'lxml':
         from lxml.etree import iterparse
     else:
-        try:
-            from lxml.etree import iterparse
-        except ImportError:
-            from xml.etree.ElementTree import iterparse
+        from xml.etree.ElementTree import iterparse
     return iterparse
 
 

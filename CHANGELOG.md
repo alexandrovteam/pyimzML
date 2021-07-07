@@ -1,5 +1,6 @@
 ## 1.5.0 (2021-07-??)
 * Handle mismatched accession for specifying "positive scan"
+* Default to ElementTree if no `parse_lib` is specified
 
 ## 1.4.1 (2020-10-26)
 * Fixed new modules missing from package
