@@ -1,9 +1,6 @@
 Welcome to pyimzML documentation!
 ===================================
 
-.. toctree::
-   :maxdepth: 2
-
 This package provides a parser of imzML format as well as a simple imzML writer.
 
 Typical usage pattern is as follows:
@@ -31,17 +28,14 @@ Typical usage pattern is as follows:
 API Reference
 =============
 
-.. automodule:: pyimzml.ImzMLParser
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. toctree::
+    :caption: API Reference
+    :glob:
 
-.. automodule:: pyimzml.ImzMLWriter
-    :members:
-    :undoc-members:
-    :show-inheritance:
+    pyimzml/*
 
-.. automodule:: pyimzml.compression
-    :members:
-    :undoc-members:
-    :show-inheritance:
+:ref:`genindex`
+
+:ref:`modindex`
+
+.. autosummary::

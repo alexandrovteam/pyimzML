@@ -17,8 +17,8 @@ import sys
 
 import sphinx_rtd_theme
 
-sys.path.append('.')
 sys.path.append('..')
+sys.path.append('../..')
 
 import rtd_gen_docs  # noqa
 from pyimzml import __version__  # noqa
@@ -28,7 +28,7 @@ rtd_gen_docs.main()
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../..'))
 
 # -- General configuration ------------------------------------------------
 
@@ -40,7 +40,11 @@ sys.path.insert(0, os.path.abspath('..'))
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
+    'sphinx_rtd_theme',
+    'sphinx_autodoc_typehints',
+    'sphinx.ext.autosummary',
 ]
 
 # source_parsers = {
@@ -90,7 +94,7 @@ language = None
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', 'tests', 'setup']
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
