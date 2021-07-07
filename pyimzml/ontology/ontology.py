@@ -25,9 +25,16 @@ DTYPE_MAPPING = {
     'xsd:dateTime': datetime,
 }
 
-FLOAT_TYPE_FIX_MAPPING = {
-'32-bit float': 'MS:1000521',
-'64-bit float': 'MS:1000523',
+ACCESSION_FIX_MAPPING = {
+    # Normally cvParam names will be updated to match the accession, but there are some
+    # known cases where exporters use the correct name and incorrect accession. This is a mapping
+    # of the known cases where the accession should be fixed, instead of the name.
+    # (erroneous accession, name) -> fixed accession
+    # Spectrum data types: https://github.com/alexandrovteam/pyimzML/pull/21#issuecomment-713818463
+    ('MS:1000523', '32-bit float'): 'MS:1000521',
+    ('MS:1000521', '64-bit float'): 'MS:1000523',
+    # Polarity
+    ('MS:1000128', 'positive scan'): 'MS:1000130'
 }
 
 
@@ -72,13 +79,12 @@ def lookup_and_convert_cv_param(accession, raw_name, value, unit_accession=None)
     if accession not in all_terms:
         warn('Unrecognized accession in <cvParam>: %s (name: "%s").' % (accession, raw_name))
     elif name != raw_name:
-        #
-        if accession in FLOAT_TYPE_FIX_MAPPING.values() and name in FLOAT_TYPE_FIX_MAPPING:
-            fixed_accession = FLOAT_TYPE_FIX_MAPPING[raw_name]
+        fixed_accession = ACCESSION_FIX_MAPPING.get((accession, raw_name))
+        if fixed_accession is not None:
             warn(
-                'Accession %s found with incorrect name "%s" (expected "%s"). '
-                'This is a known issue with some imzML conversion software - updating accession '
-                'to %s.' % (accession, raw_name, name, fixed_accession)
+                'Accession %s ("%s") found with mismatched name "%s". '
+                'This is a known bug with some imzML conversion software - using accession '
+                '%s ("%s") instead.' % (accession, name, raw_name, fixed_accession, raw_name)
             )
             accession = fixed_accession
             name = raw_name
