@@ -1,6 +1,7 @@
 ## 1.5.0 (2021-07-??)
-* Handle mismatched accession for specifying "positive scan"
-* Default to ElementTree if no `parse_lib` is specified
+* Handle mismatched accession for "positive scan"
+* Default `ImzMLParser` to ElementTree if no `parse_lib` is specified
+* Add `ImzMLParser.polarity` field
 
 ## 1.4.1 (2020-10-26)
 * Fixed new modules missing from package
@@ -8,8 +9,8 @@
 ## 1.4.0 (2020-10-23)
 * Add support for parsing all ImzML metadata
     * Global metadata is always included through `ImzMLParser.metadata`
-    * Per-spectrum metadata requires `include_spectrum_metadata='full'` 
-      or `include_spectrum_metadata=[... list of accessions]` to be passed to ImzMLParser.
+    * Per-spectrum metadata requires `include_spectra_metadata='full'` 
+      or `include_spectra_metadata=[... list of accessions]` to be passed to ImzMLParser.
 * Handle mismatched accessions for specifying data types of binary arrays
 
 ## 1.3.0 (2019-05-24)

@@ -116,6 +116,7 @@ class ImzMLParser:
         self.coordinates = []
         self.root = None
         self.metadata = None
+        self.polarity = None
         if include_spectra_metadata == 'full':
             self.spectrum_full_metadata = []
         elif include_spectra_metadata is not None:
@@ -173,12 +174,17 @@ class ImzMLParser:
         else:
             _, self.root = elem_iterator.next()
 
+        is_first_spectrum = True
+
         for event, elem in elem_iterator:
             if elem.tag == self.sl + "spectrumList" and event == "start":
                 self.__process_metadata()
                 slist = elem
             elif elem.tag == self.sl + "spectrum" and event == "end":
                 self.__process_spectrum(elem, include_spectra_metadata)
+                if is_first_spectrum:
+                    self.__read_polarity(elem)
+                    is_first_spectrum = False
                 slist.remove(elem)
         self.__fix_offsets()
 
@@ -248,6 +254,29 @@ class ImzMLParser:
             for param in include_spectra_metadata:
                 value = _get_cv_param(elem, param, deep=True, convert=True)
                 self.spectrum_metadata_fields[param].append(value)
+
+    def __read_polarity(self, elem):
+        # It's too slow to always check all spectra, so first check the referenceable_param_groups
+        # in the header to see if they indicate the polarity. If not, try to detect it from
+        # the first spectrum's full metadata.
+        # LIMITATION: This won't detect "mixed" polarity if polarity is only specified outside the
+        # referenceable_param_groups.
+        param_groups = self.metadata.referenceable_param_groups.values()
+        spectrum_metadata = SpectrumData(elem, self.metadata.referenceable_param_groups)
+        has_positive = (
+            any('positive scan' in group for group in param_groups)
+            or 'positive scan' in spectrum_metadata
+        )
+        has_negative = (
+            any('negative scan' in group for group in param_groups)
+            or 'negative scan' in spectrum_metadata
+        )
+        if has_positive and has_negative:
+            self.polarity = 'mixed'
+        elif has_positive:
+            self.polarity = 'positive'
+        elif has_negative:
+            self.polarity = 'negative'
 
     def __readimzmlmeta(self):
         """
