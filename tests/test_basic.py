@@ -41,6 +41,7 @@ class ImzMLParser(unittest.TestCase):
 
                 mzs, ints = parser.getspectrum(4)
 
+                assert parser.polarity == 'negative'
                 assert len(parser.coordinates) == 9
                 assert mzs.dtype == np.float32
                 assert ints.dtype == np.float32
@@ -50,6 +51,7 @@ class ImzMLParser(unittest.TestCase):
                 assert np.all(mzs < 800.0)
                 assert np.all(ints >= 0.0)
                 assert np.all(ints < 3.0)
+
 
     def test_files_instead_of_paths(self):
         for parse_lib, data_name, imzml_path, ibd_path in ALL_TEST_CASES:
