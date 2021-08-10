@@ -42,7 +42,7 @@ def convert_xml_value(dtype, value):
     try:
         if dtype is not None:
             return DTYPE_MAPPING[dtype](value)
-        elif value is None or value is '':
+        elif value is None or value == '':
             # Many cv_params are flags and have either a None or empty-string value.
             # Replace their value with True in these cases, so their existance isn't so ambiguous.
             return True

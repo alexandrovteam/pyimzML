@@ -1,4 +1,8 @@
-## 1.5.0 (2021-07-??)
+## 1.5.1 (2021-08-16)
+* Fix code that causes `SyntaxWarning` in Python 3.8+
+* Change `ImzmlWriter` to output "linescan left right" instead of "line scan left right", to match the ontology
+
+## 1.5.0 (2021-07-19)
 * Handle mismatched accession for "positive scan"
 * Default `ImzMLParser` to ElementTree if no `parse_lib` is specified
 * Add `ImzMLParser.polarity` field
