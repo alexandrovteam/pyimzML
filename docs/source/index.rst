@@ -19,7 +19,7 @@ Typical usage pattern is as follows:
     with ImzMLWriter('output.imzML', polarity='positive') as w:
         for mzs, intensities, coords in my_spectra:
             # writes data to the .ibd file
-            writer.addSpectrum(mzs, intensities, coords)
+            w.addSpectrum(mzs, intensities, coords)
     # at this point imzML file is written and files are closed
 
 
