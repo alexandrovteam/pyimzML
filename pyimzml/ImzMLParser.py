@@ -412,17 +412,17 @@ class ImzMLParser:
                                       self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
 
 
-def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
+def getionimage(p, mz_values, tol=0.1, z=1, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
-    of the ion with specified m/z value.
+    of the ion with specified m/z values.
 
     By default, the intensity values within the tolerance region are summed.
 
     :param p:
         the ImzMLParser (or anything else with similar attributes) for the desired dataset
-    :param mz_value:
-        m/z value for which the ion image shall be returned
+    :param mz_values:
+        m/z values for which the ion image shall be returned
     :param tol:
         Absolute tolerance for the m/z value, such that all ions with values
         mz_value-|tol| <= x <= mz_value+|tol| are included. Defaults to 0.1
@@ -443,8 +443,11 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
             UserWarning("z coordinate = 0 present, if you're getting blank images set getionimage(.., .., z=0)")
         if z_ == z:
             mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
-            min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
+            partial_ints = []
+            for mz_value in mz_values:
+                min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
+                partial_ints.append(ints[min_i:max_i + 1])
+            im[y - 1, x - 1] = reduce_func(np.concatenate(partial_ints))
     return im
 
 
