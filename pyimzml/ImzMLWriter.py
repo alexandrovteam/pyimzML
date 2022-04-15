@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, obo_names, mz_compression, int_compression, polarity, spec_type, scan_direction, scan_pattern, scan_type, line_scan_direction)
+@require(uuid, sha1sum, mz_data_type, int_data_type, mob_data_type, run_id, spectra, mode, obo_codes, obo_names, mz_compression, int_compression, mob_compression, polarity, spec_type, scan_direction, scan_pattern, scan_type, line_scan_direction)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -46,6 +46,12 @@ IMZML_TEMPLATE = """\
       <cvParam cvRef="MS" accession="MS:@obo_codes[int_data_type]" name="@int_data_type" value=""/>
       <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" unitCvRef="MS" unitAccession="MS:1000131" unitName="number of detector counts"/>
       <cvParam cvRef="MS" accession="MS:@obo_codes[int_compression]" name="@int_compression" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="true"/>
+    </referenceableParamGroup>
+    <referenceableParamGroup id="mobilityArray">
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mob_compression]" name="@mob_compression" value=""/>
+      <cvParam cvRef="MS" accession="MS:1002893" name="ion mobility array" unitCvRef="MS" unitAccession="MS:1002814" unitName="volt-second per square centimeter"/>
+      <cvParam cvRef="MS" accession="MS:@obo_codes[mob_data_type]" name="@mob_data_type" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="true"/>
     </referenceableParamGroup>
     <referenceableParamGroup id="scan1">
@@ -124,7 +130,7 @@ IMZML_TEMPLATE = """\
             @end
           </scan>
         </scanList>
-        <binaryDataArrayList count="2">
+        <binaryDataArrayList count="3">
           <binaryDataArray encodedLength="0">
             <referenceableParamGroupRef ref="mzArray"/>
             <cvParam accession="IMS:1000103" cvRef="IMS" name="external array length" value="@{s.mz_len!!s}"/>
@@ -137,6 +143,13 @@ IMZML_TEMPLATE = """\
             <cvParam accession="IMS:1000103" cvRef="IMS" name="external array length" value="@{s.int_len!!s}"/>
             <cvParam accession="IMS:1000104" cvRef="IMS" name="external encoded length" value="@{s.int_enc_len!!s}"/>
             <cvParam accession="IMS:1000102" cvRef="IMS" name="external offset" value="@{s.int_offset!!s}"/>
+            <binary/>
+          </binaryDataArray>
+          <binaryDataArray encodedLength="0">
+            <referenceableParamGroupRef ref="mobilityArray"/>
+            <cvParam accession="IMS:1000103" cvRef="IMS" name="external array length" value="@{s.mob_len!!s}"/>
+            <cvParam accession="IMS:1000104" cvRef="IMS" name="external encoded length" value="@{s.mob_enc_len!!s}"/>
+            <cvParam accession="IMS:1000102" cvRef="IMS" name="external offset" value="@{s.mob_offset!!s}"/>
             <binary/>
           </binaryDataArray>
         </binaryDataArrayList>
@@ -157,7 +170,7 @@ class _MaxlenDict(OrderedDict):
             self.popitem(0) #pop oldest
         OrderedDict.__setitem__(self, key, value)
 
-_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mz_min mz_max mz_base int_base int_tic userParams') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
+_Spectrum = namedtuple('_Spectrum', 'coords mz_len mz_offset mz_enc_len int_len int_offset int_enc_len mob_len mob_offset mob_enc_len mz_min mz_max mz_base int_base int_tic userParams') #todo: change named tuple to dict and parse xml template properly (i.e. remove hardcoding so parameters can be optional)
 
 class ImzMLWriter(object):
     """
@@ -170,6 +183,8 @@ class ImzMLWriter(object):
             The numpy data type to use for saving intensity values
         :param mz_dtype:
             The numpy data type to use for saving mz array values
+        :param mobility_dtype:
+            The numpy data ttype to use for saving mobility array values
         :param mode:
 
             * "continuous" mode will save the first mz array only
@@ -180,19 +195,32 @@ class ImzMLWriter(object):
             must be an instance of :class:`~pyimzml.compression.NoCompression` or :class:`~pyimzml.compression.ZlibCompression`
         :param mz_compression:
             How to compress the mz array data before saving
+        :param mobility_compression:
+            How to compress the mobility array data before saving
     """
     def __init__(self, output_filename,
-                 mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto", spec_type="centroid",
-                 scan_direction="top_down", line_scan_direction="line_left_right", scan_pattern="one_way", scan_type="horizontal_line", 
-                 mz_compression=NoCompression(), intensity_compression=NoCompression(),
+                 mz_dtype=np.float64,
+                 intensity_dtype=np.float32,
+                 mobility_dtype=np.float64,
+                 mode="auto",
+                 spec_type="centroid",
+                 scan_direction="top_down",
+                 line_scan_direction="line_left_right",
+                 scan_pattern="one_way",
+                 scan_type="horizontal_line",
+                 mz_compression=NoCompression(),
+                 intensity_compression=NoCompression(),
+                 mobility_compression=NoCompression(),
                  polarity=None):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
+        self.mobility_dtype = mobility_dtype
         self.mode = mode
         self.spec_type = spec_type
         self.mz_compression = mz_compression
         self.intensity_compression = intensity_compression
+        self.mobility_compression = mobility_compression
         self.run_id = os.path.splitext(output_filename)[0]
         self.filename = self.run_id + ".imzML"
         self.ibd_filename = self.run_id + ".ibd"
@@ -236,6 +264,7 @@ class ImzMLWriter(object):
         spectra = self.spectra
         mz_data_type = self._np_type_to_name(self.mz_dtype)
         int_data_type = self._np_type_to_name(self.intensity_dtype)
+        mob_data_type = self._np_type_to_name(self.mobility_dtype)
         obo_codes = {"32-bit integer": "1000519", 
                      "16-bit float": "1000520",
                      "32-bit float": "1000521",
@@ -282,6 +311,7 @@ class ImzMLWriter(object):
         spec_type = self.spec_type
         mz_compression = self.mz_compression.name
         int_compression = self.intensity_compression.name
+        mob_compression = self.mobility_compression.name
         polarity = self.polarity
         scan_direction = self.scan_direction
         scan_pattern = self.scan_pattern
@@ -332,7 +362,7 @@ class ImzMLWriter(object):
         self.lru_cache[mzs] = mz_data
         return mz_data
 
-    def addSpectrum(self, mzs, intensities, coords, userParams=[]):
+    def addSpectrum(self, mzs, intensities, mobilities, coords, userParams=[]):
         """
         Add a mass spectrum to the file.
 
@@ -340,6 +370,8 @@ class ImzMLWriter(object):
             mz array
         :param intensities:
             intensity array
+        :param mobilities:
+            mobility array
         :param coords:
 
             * 2-tuple of x and y position OR
@@ -352,6 +384,7 @@ class ImzMLWriter(object):
         if self.mode != "continuous" or self.first_mz is None:
             mzs = self.mz_compression.rounding(mzs)
         intensities = self.intensity_compression.rounding(intensities)
+        mobilities = self.mobility_compression.rounding(mobilities)
 
         if self.mode == "continuous":
             if self.first_mz is None:
@@ -366,13 +399,14 @@ class ImzMLWriter(object):
         mz_offset, mz_len, mz_enc_len = mz_data
 
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
+        mob_offset, mob_len, mob_enc_len = self._encode_and_write(mobilities, self.mobility_dtype, self.mobility_compression)
         mz_min = np.min(mzs)
         mz_max = np.max(mzs)
         ix_max = np.argmax(intensities)
         mz_base = mzs[ix_max]
         int_base = intensities[ix_max]
         int_tic = np.sum(intensities)
-        s = _Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
+        s = _Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mob_len, mob_offset, mob_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
         self.spectra.append(s)
 
     def close(self):  # 'close' is a more common use for this
@@ -424,15 +458,15 @@ def _main(argv):
     spectra = []
     with ImzMLWriter(outputfile, mz_dtype=np.float32, intensity_dtype=np.float32) as writer:
         for i, coords in enumerate(imzml.coordinates):
-            mzs, intensities = imzml.getspectrum(i)
-            writer.addSpectrum(mzs, intensities, coords)
-            spectra.append((mzs, intensities, coords))
+            mzs, intensities, mobilities = imzml.getspectrum(i)
+            writer.addSpectrum(mzs, intensities, mobilities, coords)
+            spectra.append((mzs, intensities, mobilities, coords))
 
     imzml = ImzMLParser(outputfile)
     spectra2 = []
     for i, coords in enumerate(imzml.coordinates):
-        mzs, intensities = imzml.getspectrum(i)
-        spectra2.append((mzs, intensities, coords))
+        mzs, intensities, mobilities = imzml.getspectrum(i)
+        spectra2.append((mzs, intensities, mobilities, coords))
 
     print(spectra[0] == spectra2[0])
 
