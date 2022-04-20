@@ -601,7 +601,7 @@ def _main(argv):
         outputfile=inputfile+'.imzML'
     imzml = ImzMLParser(inputfile, include_mobility=False)
     spectra = []
-    with ImzMLWriter(outputfile, mz_dtype=np.float32, intensity_dtype=np.float32) as writer:
+    with ImzMLWriter(outputfile, mz_dtype=np.float32, intensity_dtype=np.float32, include_mobility=False) as writer:
         for i, coords in enumerate(imzml.coordinates):
             mzs, intensities = imzml.getspectrum(i)
             writer.addSpectrum(mzs, intensities, coords)
@@ -617,7 +617,7 @@ def _main(argv):
 
     imzml = ImzMLParser(inputfile, include_mobility=True)
     spectra = []
-    with ImzMLWriter(outputfile, mz_dtype=np.float32, intensity_dtype=np.float32) as writer:
+    with ImzMLWriter(outputfile, mz_dtype=np.float32, intensity_dtype=np.float32, include_mobility=True) as writer:
         for i, coords in enumerate(imzml.coordinates):
             mzs, intensities, mobilities = imzml.getspectrum(i)
             writer.addSpectrum(mzs, intensities, coords, mobilities=mobilities)
