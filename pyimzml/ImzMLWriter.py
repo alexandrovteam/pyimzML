@@ -540,7 +540,7 @@ class ImzMLWriter(object):
         mz_offset, mz_len, mz_enc_len = mz_data
 
         int_offset, int_len, int_enc_len = self._encode_and_write(intensities, self.intensity_dtype, self.intensity_compression)
-        if self.include_mobility == False:
+        if self.include_mobility == True:
             mob_offset, mob_len, mob_enc_len = self._encode_and_write(mobilities, self.mobility_dtype, self.mobility_compression)
         mz_min = np.min(mzs)
         mz_max = np.max(mzs)
