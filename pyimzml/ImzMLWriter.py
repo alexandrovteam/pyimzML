@@ -374,8 +374,13 @@ class ImzMLWriter(object):
 
         self._write_ibd(self.uuid.bytes)
 
-        self.wheezy_engine = Engine(loader=DictLoader({'imzml': IMZML_TEMPLATE}), extensions=[CoreExtension()])
-        self.imzml_template = self.wheezy_engine.get_template('imzml')
+        if self.include_mobility == False:
+            self.wheezy_engine = Engine(loader=DictLoader({'imzml': IMZML_TEMPLATE}), extensions=[CoreExtension()])
+            self.imzml_template = self.wheezy_engine.get_template('imzml')
+        elif self.include_mobility == True:
+            self.wheezy_engine = Engine(loader=DictLoader({'imzml': IMZML_MOBILITY_TEMPLATE}),
+                                        extensions=[CoreExtension()])
+            self.imzml_template = self.wheezy_engine.get_template('imzml')
         self.spectra = []
         self.first_mz = None
         self.hashes = defaultdict(list)  # mz_hash -> list of mz_data (disk location)
@@ -549,7 +554,7 @@ class ImzMLWriter(object):
         int_base = intensities[ix_max]
         int_tic = np.sum(intensities)
         if self.include_mobility == True:
-            s = _Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mob_len, mob_offset, mob_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
+            s = _Spectrum_Mobility(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mob_len, mob_offset, mob_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
         elif self.include_mobility == False:
             s = _Spectrum(coords, mz_len, mz_offset, mz_enc_len, int_len, int_offset, int_enc_len, mz_min, mz_max, mz_base, int_base, int_tic, userParams)
         self.spectra.append(s)
