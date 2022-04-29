@@ -178,7 +178,7 @@ IMZML_MOBILITY_TEMPLATE = """\
     </referenceableParamGroup>
     <referenceableParamGroup id="mobilityArray">
       <cvParam cvRef="MS" accession="MS:@obo_codes[mob_compression]" name="@mob_compression" value=""/>
-      <cvParam cvRef="MS" accession="MS:1002893" name="ion mobility array" unitCvRef="MS" unitAccession="MS:1002814" unitName="volt-second per square centimeter"/>
+      <cvParam cvRef="MS" accession="MS:1003006" name="mean inverse reduced ion mobility array" unitCvRef="MS" unitAccession="MS:1002814" unitName="volt-second per square centimeter"/>
       <cvParam cvRef="MS" accession="MS:@obo_codes[mob_data_type]" name="@mob_data_type" value=""/>
       <cvParam cvRef="IMS" accession="IMS:1000101" name="external data" value="true"/>
     </referenceableParamGroup>
