@@ -7,7 +7,7 @@ setup(
     description="Parser for conversion of imzML 1.1.0 files",
     long_description="""
 Parser for conversion of imzML 1.1.0 files.
-See specification here: http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf.
+See specification here: https://ms-imaging.org/wp-content/uploads/2009/08/specifications_imzML1.1.0_RC1.pdf.
 Outputs data as python lists and dicts.
 
 Python 3.3 or newer is recommended for performance reasons.""",

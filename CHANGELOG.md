@@ -1,3 +1,6 @@
+## 1.5.2 (2022-07-21)
+* Change url for imzML 1.1.0 specification.
+
 ## 1.5.1 (2021-08-16)
 * Fix code that causes `SyntaxWarning` in Python 3.8+
 * Change `ImzmlWriter` to output "linescan left right" instead of "line scan left right", to match the ontology

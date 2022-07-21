@@ -57,7 +57,7 @@ def _get_cv_param(elem, accession, deep=False, convert=False):
 class ImzMLParser:
     """
     Parser for imzML 1.1.0 files (see specification here:
-    http://imzml.org/download/imzml/specifications_imzML1.1.0_RC1.pdf).
+    https://ms-imaging.org/wp-content/uploads/2009/08/specifications_imzML1.1.0_RC1.pdf ).
 
     Iteratively reads the .imzML file into memory while pruning the per-spectrum metadata (everything in
     <spectrumList> elements) during initialization. Returns a spectrum upon calling getspectrum(i). The binary file
