@@ -520,11 +520,11 @@ def getionimage(p, mz_value=0, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduc
         if z_ == 0:
             UserWarning("z coordinate = 0 present, if you're getting blank images set getionimage(.., .., z=0)")
         if z_ == z:
+            if p.include_mobility == True:
+                mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
+            elif p.include_mobility == False:
+                mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
             if mz_value != 0:
-                if p.include_mobility == True:
-                    mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
-                elif p.include_mobility == False:
-                    mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
                 min_i, max_i = _bisect_spectrum(mzs, mz_value, mz_tol)
                 if p.include_mobility == True:
                     if mob_value != 0:
