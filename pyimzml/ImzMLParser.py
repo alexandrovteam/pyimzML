@@ -405,13 +405,20 @@ class ImzMLParser:
             mz_bytes, intensity_bytes, mobility_bytes = self.get_spectrum_as_string(index)
         elif self.include_mobility == False:
             mz_bytes, intensity_bytes = self.get_spectrum_as_string(index)
-        mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
-        intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
-        if self.include_mobility == True:
-            mobility_array = np.frombuffer(mobility_bytes, dtype=self.mobilityPrecision)
-            return mz_array, intensity_array, mobility_array
-        elif self.include_mobility == False:
-            return mz_array, intensity_array
+        # TODO: Last pixel/frame seems to have incorrect byte sizes? unsure if pyimzML issue or TIMSCONVERT issue
+        if len(mz_bytes) == len(intensity_bytes):
+            mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
+            intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
+            if self.include_mobility == True:
+                mobility_array = np.frombuffer(mobility_bytes, dtype=self.mobilityPrecision)
+                return mz_array, intensity_array, mobility_array
+            elif self.include_mobility == False:
+                return mz_array, intensity_array
+        else:
+            if self.include_mobility == True:
+                return np.zeros(1), np.zeros(1), np.zeros(1)
+            elif self.include_mobility == False:
+                return np.zeros(1), np.zeros(1)
 
     def get_spectrum_as_string(self, index):
         """
@@ -506,7 +513,10 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
         if z_ == 0:
             UserWarning("z coordinate = 0 present, if you're getting blank images set getionimage(.., .., z=0)")
         if z_ == z:
-            mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
+            if p.include_mobility == True:
+                mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
+            elif p.include_mobility == False:
+                mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
             min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
             im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
     return im
