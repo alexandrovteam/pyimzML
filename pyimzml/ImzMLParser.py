@@ -483,7 +483,7 @@ class ImzMLParser:
                                           self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
 
 
-def getionimage(p, mz_value, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduce_func=sum):
+def getionimage(p, mz_value=0, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
@@ -520,23 +520,26 @@ def getionimage(p, mz_value, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduce_
         if z_ == 0:
             UserWarning("z coordinate = 0 present, if you're getting blank images set getionimage(.., .., z=0)")
         if z_ == z:
-            if p.include_mobility == True:
-                mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
-            elif p.include_mobility == False:
-                mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
-            min_i, max_i = _bisect_spectrum(mzs, mz_value, mz_tol)
-            if p.include_mobility == True:
-                if mob_value != 0:
-                    # subset arrays
-                    mzs = mzs[min_i:max_i+1]
-                    ints = ints[min_i:max_i+1]
-                    mobs = mobs[min_i:max_i+1]
-                    # sort by mobility
-                    mzs = mzs[mobs.argsort()]
-                    ints = ints[mobs.argsort()]
-                    mobs = mobs[mobs.argsort()]
-                    min_i, max_i = _bisect_spectrum(mobs, mob_value, mob_tol)
-            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
+            if mz_value != 0:
+                if p.include_mobility == True:
+                    mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
+                elif p.include_mobility == False:
+                    mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
+                min_i, max_i = _bisect_spectrum(mzs, mz_value, mz_tol)
+                if p.include_mobility == True:
+                    if mob_value != 0:
+                        # subset arrays
+                        mzs = mzs[min_i:max_i+1]
+                        ints = ints[min_i:max_i+1]
+                        mobs = mobs[min_i:max_i+1]
+                        # sort by mobility
+                        mzs = mzs[mobs.argsort()]
+                        ints = ints[mobs.argsort()]
+                        mobs = mobs[mobs.argsort()]
+                        min_i, max_i = _bisect_spectrum(mobs, mob_value, mob_tol)
+                im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
+            else:
+                im[y - 1, x - 1] = reduce_func(ints)
     return im
 
 
