@@ -260,8 +260,9 @@ class ImzMLParser:
                 mz_group = e
             elif ref == self.intGroupId:
                 int_group = e
-            elif ref == self.mobGroupId and self.include_mobility == True:
-                mob_group = e
+            elif self.include_mobility == True:
+                if ref == self.mobGroupId:
+                    mob_group = e
         self.mzOffsets.append(int(_get_cv_param(mz_group, 'IMS:1000102')))
         self.mzLengths.append(int(_get_cv_param(mz_group, 'IMS:1000103')))
         self.intensityOffsets.append(int(_get_cv_param(int_group, 'IMS:1000102')))
