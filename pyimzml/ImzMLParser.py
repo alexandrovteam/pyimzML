@@ -235,7 +235,7 @@ class ImzMLParser:
                         if name in param_group.param_by_name:
                             self.intensityPrecision = dtype
                 if self.include_mobility == True:
-                    if 'ion mobility array' in param_group.param_by_name:
+                    if 'mean inverse reduced ion mobility array' in param_group.param_by_name:
                         self.mobGroupId = param_id
                         for name, dtype in self.precisionDict.items():
                             if name in param_group.param_by_name:
