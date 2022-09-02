@@ -483,7 +483,7 @@ class ImzMLParser:
                                           self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
 
 
-def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
+def getionimage(p, mz_value, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
@@ -494,9 +494,15 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
         the ImzMLParser (or anything else with similar attributes) for the desired dataset
     :param mz_value:
         m/z value for which the ion image shall be returned
-    :param tol:
+    :param mz_tol:
         Absolute tolerance for the m/z value, such that all ions with values
-        mz_value-|tol| <= x <= mz_value+|tol| are included. Defaults to 0.1
+        mz_value-|mz_tol| <= x <= mz_value+|mz_tol| are included. Defaults to 0.1
+    :param mob_value:
+        mobility (1/k0) value for which the ion image shall be returned.
+        If mob_value = 0, the entire ion mobility (1/k0) range will be used. Defaults to 0.
+    :param mob_tol:
+        Absolute tolerance for the mobility value, such that all ions with values
+        mob_value-|mob_tol| <= x <= mob_value+|mob_tol| are included. Defaults to 0.01
     :param z:
         z Value if spectrogram is 3-dimensional.
     :param reduce_func:
@@ -507,7 +513,7 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
         numpy matrix with each element representing the ion intensity in this
         pixel. Can be easily plotted with matplotlib
     """
-    tol = abs(tol)
+    mz_tol = abs(mz_tol)
     im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
     for i, (x, y, z_) in enumerate(p.coordinates):
         if z_ == 0:
@@ -517,7 +523,18 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
                 mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
             elif p.include_mobility == False:
                 mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
-            min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
+            min_i, max_i = _bisect_spectrum(mzs, mz_value, mz_tol)
+            if p.include_mobility == True:
+                if mob_value != 0:
+                    # subset arrays
+                    mzs = mzs[min_i:max_i+1]
+                    ints = ints[min_i:max_i+1]
+                    mobs = mobs[min_i:max_i+1]
+                    # sort by mobility
+                    mzs = mzs[mobs.argsort()]
+                    ints = ints[mobs.argsort()]
+                    mobs = mobs[mobs.argsort()]
+                    min_i, max_i = _bisect_spectrum(mobs, mob_value, mob_tol)
             im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
     return im
 
