@@ -514,6 +514,7 @@ def getionimage(p, mz_value, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduce_
         pixel. Can be easily plotted with matplotlib
     """
     mz_tol = abs(mz_tol)
+    mob_tol = abs(mob_tol)
     im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
     for i, (x, y, z_) in enumerate(p.coordinates):
         if z_ == 0:
