@@ -10,8 +10,10 @@ Typical usage pattern is as follows:
     from pyimzml.ImzMLParser import ImzMLParser
 
     p = ImzMLParser('Example.imzML')
+    my_spectra = []
     for idx, (x,y,z) in enumerate(p.coordinates):
         mzs, intensities = p.getspectrum(idx)
+        my_spectra.append([mzs, intensities, (x, y, z)])
         # ...
 
     from pyimzml.ImzMLWriter import ImzMLWriter
@@ -19,7 +21,7 @@ Typical usage pattern is as follows:
     with ImzMLWriter('output.imzML', polarity='positive') as w:
         for mzs, intensities, coords in my_spectra:
             # writes data to the .ibd file
-            writer.addSpectrum(mzs, intensities, coords)
+            w.addSpectrum(mzs, intensities, coords)
     # at this point imzML file is written and files are closed
 
 
