@@ -1,3 +1,6 @@
+## 1.5.3 (2022-11-09)
+* Fixing a bug in the documentation.
+
 ## 1.5.2 (2022-07-21)
 * Change url for imzML 1.1.0 specification.
 
