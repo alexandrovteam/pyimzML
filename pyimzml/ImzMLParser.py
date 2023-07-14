@@ -76,6 +76,7 @@ class ImzMLParser:
             parse_lib=None,
             ibd_file=INFER_IBD_FROM_IMZML,
             include_spectra_metadata=None,
+            include_mobility=False,
     ):
         """
         Opens the two files corresponding to the file name, reads the entire .imzML
@@ -98,7 +99,13 @@ class ImzMLParser:
                 each spectrum. Note that for performance reasons, this mode only searches the
                 spectrum itself for the value. It won't check any referenced referenceable param
                 groups if the accession ID isn't present in the spectrum metadata.
+        :param include_mobility:
+            bool: True or False
+            Whether imzML schema should include trapped ion mobility spectrometry data. Units/metadata based
+            on Bruker TIMS data.
         """
+        # Whether to include ion mobility data.
+        self.include_mobility = include_mobility
         # ElementTree requires the schema location for finding tags (why?) but
         # fails to read it from the root element. As this should be identical
         # for all imzML files, it is hard-coded here and prepended before every tag
@@ -124,8 +131,15 @@ class ImzMLParser:
             self.spectrum_metadata_fields = {
                 k: [] for k in include_spectra_metadata
             }
+        if self.include_mobility == True:
+            self.mobilityOffsets = []
+            self.mobilityLengths = []
 
-        self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
+        if self.include_mobility == True:
+            self.mzGroupId = self.intGroupId = self.mobGroupId = self.mzPrecision = self.intensityPrecision = self.mobilityPrecision = None
+        elif self.include_mobility == False:
+            self.mzGroupId = self.intGroupId = self.mzPrecision = self.intensityPrecision = None
+
         self.iterparse = choose_iterparse(parse_lib)
         self.__iter_read_spectrum_meta(include_spectra_metadata)
         if ibd_file is INFER_IBD_FROM_IMZML:
@@ -203,6 +217,8 @@ class ImzMLParser:
 
         self.mzOffsets = fix(self.mzOffsets)
         self.intensityOffsets = fix(self.intensityOffsets)
+        if self.include_mobility == True:
+            self.mobilityOffsets = fix(self.mobilityOffsets)
 
     def __process_metadata(self):
         if self.metadata is None:
@@ -218,25 +234,42 @@ class ImzMLParser:
                     for name, dtype in self.precisionDict.items():
                         if name in param_group.param_by_name:
                             self.intensityPrecision = dtype
+                if self.include_mobility == True:
+                    if 'mean inverse reduced ion mobility array' in param_group.param_by_name:
+                        self.mobGroupId = param_id
+                        for name, dtype in self.precisionDict.items():
+                            if name in param_group.param_by_name:
+                                self.mobilityPrecision = dtype
             if not hasattr(self, 'mzPrecision'):
                 raise RuntimeError("Could not determine m/z precision")
             if not hasattr(self, 'intensityPrecision'):
                 raise RuntimeError("Could not determine intensity precision")
+            if self.include_mobility == True:
+                if not hasattr(self, 'mobilityPrecision'):
+                    raise RuntimeError("Could not determine mobility precision")
 
     def __process_spectrum(self, elem, include_spectra_metadata):
         arrlistelem = elem.find('%sbinaryDataArrayList' % self.sl)
         mz_group = None
         int_group = None
+        if self.include_mobility == True:
+            mob_group = None
         for e in arrlistelem:
             ref = e.find('%sreferenceableParamGroupRef' % self.sl).attrib["ref"]
             if ref == self.mzGroupId:
                 mz_group = e
             elif ref == self.intGroupId:
                 int_group = e
+            elif self.include_mobility == True:
+                if ref == self.mobGroupId:
+                    mob_group = e
         self.mzOffsets.append(int(_get_cv_param(mz_group, 'IMS:1000102')))
         self.mzLengths.append(int(_get_cv_param(mz_group, 'IMS:1000103')))
         self.intensityOffsets.append(int(_get_cv_param(int_group, 'IMS:1000102')))
         self.intensityLengths.append(int(_get_cv_param(int_group, 'IMS:1000103')))
+        if self.include_mobility == True:
+            self.mobilityOffsets.append(int(_get_cv_param(mob_group, 'IMS:1000102')))
+            self.mobilityLengths.append(int(_get_cv_param(mob_group, 'IMS:1000103')))
         scan_elem = elem.find('%sscanList/%sscan' % (self.sl, self.sl))
         x = _get_cv_param(scan_elem, 'IMS:1000050')
         y = _get_cv_param(scan_elem, 'IMS:1000051')
@@ -364,11 +397,28 @@ class ImzMLParser:
             spectrum
         intensity_array: numpy.ndarray
             Sequence of intensity values corresponding to mz_array
+        mobility_array: numpy.ndarray
+            Sequence of mobility values corresponding to mz_array. Only returned if
+            self.include_mobility == True.
         """
-        mz_bytes, intensity_bytes = self.get_spectrum_as_string(index)
-        mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
-        intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
-        return mz_array, intensity_array
+        if self.include_mobility == True:
+            mz_bytes, intensity_bytes, mobility_bytes = self.get_spectrum_as_string(index)
+        elif self.include_mobility == False:
+            mz_bytes, intensity_bytes = self.get_spectrum_as_string(index)
+        # TODO: Last pixel/frame seems to have incorrect byte sizes? unsure if pyimzML issue or TIMSCONVERT issue
+        if len(mz_bytes) == len(intensity_bytes):
+            mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
+            intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
+            if self.include_mobility == True:
+                mobility_array = np.frombuffer(mobility_bytes, dtype=self.mobilityPrecision)
+                return mz_array, intensity_array, mobility_array
+            elif self.include_mobility == False:
+                return mz_array, intensity_array
+        else:
+            if self.include_mobility == True:
+                return np.zeros(1), np.zeros(1), np.zeros(1)
+            elif self.include_mobility == False:
+                return np.zeros(1), np.zeros(1)
 
     def get_spectrum_as_string(self, index):
         """
@@ -388,16 +438,31 @@ class ImzMLParser:
         intensity_string:
             string where each character represents a byte of the intensity array of
             the spectrum
+        mobility_string:
+            string where each character representts a byte of the mobility array of
+            the spectrum
+            Only returned if self.include_mobility == True
         """
-        offsets = [self.mzOffsets[index], self.intensityOffsets[index]]
-        lengths = [self.mzLengths[index], self.intensityLengths[index]]
+        if self.include_mobility == True:
+            offsets = [self.mzOffsets[index], self.intensityOffsets[index], self.mobilityOffsets[index]]
+            lengths = [self.mzLengths[index], self.intensityLengths[index], self.mobilityLengths[index]]
+        elif self.include_mobility == False:
+            offsets = [self.mzOffsets[index], self.intensityOffsets[index]]
+            lengths = [self.mzLengths[index], self.intensityLengths[index]]
         lengths[0] *= self.sizeDict[self.mzPrecision]
         lengths[1] *= self.sizeDict[self.intensityPrecision]
+        if self.include_mobility == True:
+            lengths[2] *= self.sizeDict[self.mobilityPrecision]
         self.m.seek(offsets[0])
         mz_string = self.m.read(lengths[0])
         self.m.seek(offsets[1])
         intensity_string = self.m.read(lengths[1])
-        return mz_string, intensity_string
+        if self.include_mobility == True:
+            self.m.seek(offsets[2])
+            mobility_string = self.m.read(lengths[2])
+            return mz_string, intensity_string, mobility_string
+        elif self.include_mobility == False:
+            return mz_string, intensity_string
 
     def portable_spectrum_reader(self):
         """
@@ -407,12 +472,18 @@ class ImzMLParser:
         The PortableSpectrumReader can be safely pickled and unpickled, making it useful for reading the spectra
         in a distributed environment such as PySpark or PyWren.
         """
-        return PortableSpectrumReader(self.coordinates,
-                                      self.mzPrecision, self.mzOffsets, self.mzLengths,
-                                      self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
+        if self.include_mobility == True:
+            return PortableSpectrumReader(self.coordinates,
+                                          self.mzPrecision, self.mzOffsets, self.mzLengths,
+                                          self.intensityPrecision, self.intensityOffsets, self.intensityLengths,
+                                          self.mobilityPrecision, self.mobilityOffsets, self.mobilityLengths)
+        elif self.include_mobility == False:
+            return PortableSpectrumReader(self.coordinates,
+                                          self.mzPrecision, self.mzOffsets, self.mzLengths,
+                                          self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
 
 
-def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
+def getionimage(p, mz_value=0, mz_tol=0.1, mob_value=0, mob_tol=0.01, z=1, reduce_func=sum):
     """
     Get an image representation of the intensity distribution
     of the ion with specified m/z value.
@@ -423,9 +494,15 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
         the ImzMLParser (or anything else with similar attributes) for the desired dataset
     :param mz_value:
         m/z value for which the ion image shall be returned
-    :param tol:
+    :param mz_tol:
         Absolute tolerance for the m/z value, such that all ions with values
-        mz_value-|tol| <= x <= mz_value+|tol| are included. Defaults to 0.1
+        mz_value-|mz_tol| <= x <= mz_value+|mz_tol| are included. Defaults to 0.1
+    :param mob_value:
+        mobility (1/k0) value for which the ion image shall be returned.
+        If mob_value = 0, the entire ion mobility (1/k0) range will be used. Defaults to 0.
+    :param mob_tol:
+        Absolute tolerance for the mobility value, such that all ions with values
+        mob_value-|mob_tol| <= x <= mob_value+|mob_tol| are included. Defaults to 0.01
     :param z:
         z Value if spectrogram is 3-dimensional.
     :param reduce_func:
@@ -436,15 +513,33 @@ def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
         numpy matrix with each element representing the ion intensity in this
         pixel. Can be easily plotted with matplotlib
     """
-    tol = abs(tol)
+    mz_tol = abs(mz_tol)
+    mob_tol = abs(mob_tol)
     im = np.zeros((p.imzmldict["max count of pixels y"], p.imzmldict["max count of pixels x"]))
     for i, (x, y, z_) in enumerate(p.coordinates):
         if z_ == 0:
             UserWarning("z coordinate = 0 present, if you're getting blank images set getionimage(.., .., z=0)")
         if z_ == z:
-            mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
-            min_i, max_i = _bisect_spectrum(mzs, mz_value, tol)
-            im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
+            if p.include_mobility == True:
+                mzs, ints, mobs = map(lambda x: np.asarray(x), p.getspectrum(i))
+            elif p.include_mobility == False:
+                mzs, ints = map(lambda x: np.asarray(x), p.getspectrum(i))
+            if mz_value != 0:
+                min_i, max_i = _bisect_spectrum(mzs, mz_value, mz_tol)
+                if p.include_mobility == True:
+                    if mob_value != 0:
+                        # subset arrays
+                        mzs = mzs[min_i:max_i+1]
+                        ints = ints[min_i:max_i+1]
+                        mobs = mobs[min_i:max_i+1]
+                        # sort by mobility
+                        mzs = mzs[mobs.argsort()]
+                        ints = ints[mobs.argsort()]
+                        mobs = mobs[mobs.argsort()]
+                        min_i, max_i = _bisect_spectrum(mobs, mob_value, mob_tol)
+                im[y - 1, x - 1] = reduce_func(ints[min_i:max_i+1])
+            else:
+                im[y - 1, x - 1] = reduce_func(ints)
     return im
 
 
@@ -565,7 +660,8 @@ class PortableSpectrumReader(object):
     """
 
     def __init__(self, coordinates, mzPrecision, mzOffsets, mzLengths,
-                 intensityPrecision, intensityOffsets, intensityLengths):
+                 intensityPrecision, intensityOffsets, intensityLengths,
+                 mobilityPrecision=None, mobilityOffsets=None, mobilityLengths=None):
         self.coordinates = coordinates
         self.mzPrecision = mzPrecision
         self.mzOffsets = mzOffsets
@@ -573,6 +669,14 @@ class PortableSpectrumReader(object):
         self.intensityPrecision = intensityPrecision
         self.intensityOffsets = intensityOffsets
         self.intensityLengths = intensityLengths
+        self.mobilityPrecision = mobilityPrecision
+        self.mobilityOffsets = mobilityOffsets
+        self.mobilityLengths = mobilityLengths
+
+        if mobilityPrecision is None and mobilityOffsets is None and mobilityLengths is None:
+            self.include_mobility = False
+        else:
+            self.include_mobility = True
 
     def read_spectrum_from_file(self, file, index):
         """
@@ -590,6 +694,9 @@ class PortableSpectrumReader(object):
             spectrum
         intensity_array: numpy.ndarray
             Sequence of intensity values corresponding to mz_array
+        mobility_array: numpy.ndarray
+            Sequence of mobility values corresponding to mz_array
+            Only included if trapped ion mobility data is present
         """
         file.seek(self.mzOffsets[index])
         mz_bytes = file.read(self.mzLengths[index] * SIZE_DICT[self.mzPrecision])
@@ -599,4 +706,10 @@ class PortableSpectrumReader(object):
         mz_array = np.frombuffer(mz_bytes, dtype=self.mzPrecision)
         intensity_array = np.frombuffer(intensity_bytes, dtype=self.intensityPrecision)
 
-        return mz_array, intensity_array
+        if self.include_mobility == True:
+            file.seek(self.mobilityOffsets[index])
+            mobility_bytes = file.read(self.mobilityLengths[index] * SIZE_DICT[self.mobilityPrecision])
+            mobility_array = np.frombuffer(mobility_bytes, dtype=self.mobilityPrecision)
+            return mz_array, intensity_array, mobility_array
+        elif self.include_mobility == False:
+            return mz_array, intensity_array
