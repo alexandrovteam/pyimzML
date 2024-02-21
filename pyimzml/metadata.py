@@ -169,7 +169,7 @@ class ParamGroup:
             name = node.get('name')
             dtype = node.get('dtype')
             raw_value = node.get('value')
-            parsed_value = convert_xml_value(raw_value, dtype)
+            parsed_value = convert_xml_value(dtype, raw_value)
             unit_accession = node.get('unitAccession')
             unit_name = convert_term_name(unit_accession)
             self.user_params.append(
