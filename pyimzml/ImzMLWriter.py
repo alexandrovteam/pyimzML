@@ -13,7 +13,7 @@ from wheezy.template import Engine, CoreExtension, DictLoader
 from pyimzml.compression import NoCompression, ZlibCompression
 
 IMZML_TEMPLATE = """\
-@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, obo_names, mz_compression, int_compression, polarity, spec_type, scan_direction, scan_pattern, scan_type, line_scan_direction)
+@require(uuid, sha1sum, mz_data_type, int_data_type, run_id, spectra, mode, obo_codes, obo_names, mz_compression, int_compression, polarity, pixel_size, spec_type, scan_direction, scan_pattern, scan_type, line_scan_direction)
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0_idx.xsd" version="1.1">
   <cvList count="2">
@@ -82,6 +82,8 @@ IMZML_TEMPLATE = """\
       <cvParam cvRef="IMS" accession="IMS:@obo_codes[line_scan_direction]" name="@obo_names[line_scan_direction]"/>
       <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="@{(max(s.coords[0] for s in spectra))!!s}"/>
       <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="@{(max(s.coords[1] for s in spectra))!!s}"/>
+      <cvParam cvRef="IMS" accession="IMS:1000046" name="pixel size (x)" value="@{pixel_size[0]!!s}"/>
+      <cvParam cvRef="IMS" accession="IMS:1000047" name="pixel size y" value="@{pixel_size[1]!!s}"/>
     </scanSettings>
   </scanSettingsList>
 
@@ -118,9 +120,9 @@ IMZML_TEMPLATE = """\
             <cvParam accession="IMS:1000052" cvRef="IMS" name="position z" value="@{s.coords[2]!!s}"/>
             @end
             @if s.userParams:
-                @for up in s.userParams:
-                <userParam name="@up['name']" value="@up['value']"/> 
-                @end
+            @for up in s.userParams:
+            <userParam name="@up['name']" value="@up['value']"/>
+            @end
             @end
           </scan>
         </scanList>
@@ -185,7 +187,7 @@ class ImzMLWriter(object):
                  mz_dtype=np.float64, intensity_dtype=np.float32, mode="auto", spec_type="centroid",
                  scan_direction="top_down", line_scan_direction="line_left_right", scan_pattern="one_way", scan_type="horizontal_line", 
                  mz_compression=NoCompression(), intensity_compression=NoCompression(),
-                 polarity=None):
+                 polarity=None, pixel_size=(1, 1)):
 
         self.mz_dtype = mz_dtype
         self.intensity_dtype = intensity_dtype
@@ -205,6 +207,7 @@ class ImzMLWriter(object):
         self.scan_pattern = scan_pattern
         self.scan_type = scan_type
         self.line_scan_direction = line_scan_direction
+        self.pixel_size = pixel_size
 
         self._write_ibd(self.uuid.bytes)
 
@@ -287,6 +290,7 @@ class ImzMLWriter(object):
         scan_pattern = self.scan_pattern
         scan_type = self.scan_type
         line_scan_direction = self.line_scan_direction
+        pixel_size = self.pixel_size
         
         self.xml.write(self.imzml_template.render(locals()))
 
