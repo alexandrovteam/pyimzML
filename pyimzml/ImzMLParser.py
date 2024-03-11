@@ -58,12 +58,12 @@ def _get_cv_param(elem, accession, deep=False, convert=False):
 
 
 def calc_mzs_digitize(mzs: np.ndarray) -> Counter:
-    """Calculate the number of peaks in the interval ±0.5 around the thompson unit"""
+    """Calculate the number of peaks in the interval [-0.5 Da + int(mz), +0.5 Da + int(mz)]"""
     mzs_min = int((mzs.min() // 1 - 0.5) * 10)
     mzs_max = int((mzs.max() // 1 + 2.5) * 10)
 
     bins = np.array([i / 10.0 for i in range(mzs_min, mzs_max, 10)])
-    mzs_units = [int(i + 0.51) for i in bins]  # thompson unit
+    mzs_units = [int(i + 0.51) for i in bins]  # integer value of mz
 
     mzs_counts = [mzs_units[i] for i in np.digitize(mzs, bins, right=False)]
     mzs_digitized = Counter(mzs_counts)
@@ -444,7 +444,7 @@ class ImzMLParser:
                                       self.mzPrecision, self.mzOffsets, self.mzLengths,
                                       self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
 
-    def check_peaks_overlap(self, n_peaks: int = 100, ppm: float = 3.0) -> float:
+    def check_peaks_overlap(self, n_spectrum: int = 100, ppm: float = 3.0) -> float:
         """
         This function represents an approach for finding non-centroided datasets based on
         comparing the distance to the neighboring peak and shifting the existing peak by N ppm.
@@ -455,7 +455,7 @@ class ImzMLParser:
         """
         indexes = set([
             random.randrange(0, len(self.coordinates))
-            for _ in range(min(len(self.coordinates), n_peaks))
+            for _ in range(min(len(self.coordinates), n_spectrum))
         ])
 
         n_overlap_peaks = []
@@ -469,7 +469,7 @@ class ImzMLParser:
         overlap_percentage = sum(n_overlap_peaks) / sum(non_zero_peaks) * 100.0
         return round(overlap_percentage, 2)
 
-    def get_pixel_statistics(self, idx: int) -> Dict[str, Any]:
+    def get_spectrum_statistics(self, idx: int) -> Dict[str, Any]:
         """Calculate all the necessary metrics about m/z and intensity for the one spectrum"""
         mzs, ints = self.getspectrum(idx)
         nonzero_ints_indx = np.where(ints > 0.0)[0]
@@ -491,13 +491,13 @@ class ImzMLParser:
                 'total_peaks_count': len(ints),
             }
 
-    def calc_statistics(self, n_pixels: int = 0, full: bool = False) -> Dict[str, Any]:
+    def calc_statistics(self, n_spectrum: int = 0, full: bool = False) -> Dict[str, Any]:
         """
         Calculate the statistics of the number of peaks for the entire dataset,
-        as well as full/n_pixels is setting up - calculate extended statistics for each pixel
+        as well as full/n_spectrum is setting up - calculate extended statistics for each spectrum
 
-        :param n_pixels: the number of pixels to analyze
-        :param full: analysis of all pixels
+        :param n_spectrum: the number of spectrum to analyze
+        :param full: analysis of all spectrum
         """
         peaks_statistics = {
             'ds_peaks_stats': {
@@ -508,13 +508,13 @@ class ImzMLParser:
             }
         }
 
-        # select all coordinates or a subset depending on the value of the full/n_pixels variables
+        # select all coordinates or a subset depending on the value of the full/n_spectrum variables
         if full:
             indexes = list(range(len(self.coordinates)))
-        elif n_pixels:
+        elif n_spectrum:
             indexes = set([
                 random.randrange(0, len(self.coordinates))
-                for _ in range(min(len(self.coordinates), n_pixels))
+                for _ in range(min(len(self.coordinates), n_spectrum))
             ])
         else:
             indexes = []
@@ -526,19 +526,19 @@ class ImzMLParser:
             nonzero_intensity_peaks_count, total_peaks_count = [], []
             mzs_digitized = Counter()
             for idx in indexes:
-                pixel_stats = self.get_pixel_statistics(idx)
-                if not pixel_stats:
+                spectrum_stats = self.get_spectrum_statistics(idx)
+                if not spectrum_stats:
                     continue
-                mzs_min.append(pixel_stats['mzs_min'])
-                mzs_max.append(pixel_stats['mzs_max'])
-                mzs_digitized += pixel_stats['mzs_digitized']
-                ints_min.append(pixel_stats['ints_min'])
-                ints_50p.append(pixel_stats['ints_50p'])
-                ints_95p.append(pixel_stats['ints_95p'])
-                ints_max.append(pixel_stats['ints_max'])
-                ints_total.append(pixel_stats['ints_total'])
-                nonzero_intensity_peaks_count.append(pixel_stats['nonzero_intensity_peaks_count'])
-                total_peaks_count.append(pixel_stats['total_peaks_count'])
+                mzs_min.append(spectrum_stats['mzs_min'])
+                mzs_max.append(spectrum_stats['mzs_max'])
+                mzs_digitized += spectrum_stats['mzs_digitized']
+                ints_min.append(spectrum_stats['ints_min'])
+                ints_50p.append(spectrum_stats['ints_50p'])
+                ints_95p.append(spectrum_stats['ints_95p'])
+                ints_max.append(spectrum_stats['ints_max'])
+                ints_total.append(spectrum_stats['ints_total'])
+                nonzero_intensity_peaks_count.append(spectrum_stats['nonzero_intensity_peaks_count'])
+                total_peaks_count.append(spectrum_stats['total_peaks_count'])
 
             peaks_statistics.update({
                 'mz_min': min(mzs_min),
