@@ -16,8 +16,11 @@
 
 from bisect import bisect_left, bisect_right
 import sys
+import random
 import re
+from collections import Counter
 from pathlib import Path
+from typing import Dict, Tuple, Any
 
 from warnings import warn
 import numpy as np
@@ -52,6 +55,36 @@ def _get_cv_param(elem, accession, deep=False, convert=False):
         if convert:
             return convert_cv_param(accession, node.get('value'))
         return node.get('value')
+
+
+def calc_mzs_digitize(mzs: np.ndarray) -> Counter:
+    """Calculate the number of peaks in the interval ±0.5 around the thompson unit"""
+    mzs_min = int((mzs.min() // 1 - 0.5) * 10)
+    mzs_max = int((mzs.max() // 1 + 2.5) * 10)
+
+    bins = np.array([i / 10.0 for i in range(mzs_min, mzs_max, 10)])
+    mzs_units = [int(i + 0.51) for i in bins]  # thompson unit
+
+    mzs_counts = [mzs_units[i] for i in np.digitize(mzs, bins, right=False)]
+    mzs_digitized = Counter(mzs_counts)
+    return mzs_digitized
+
+
+def calc_peaks_overlap(mzs: np.array, ints: np.array, ppm: float) -> Tuple[int, int]:
+    """Calculate the number of peaks that, when shifted by ppm, are interrupted by others"""
+
+    # select peaks that have non-zero intensity
+    non_zero_ints = np.where(ints > 0.0)[0]
+    non_zero_mz = mzs[non_zero_ints]
+
+    # calculation of the absolute value of the shift of each peak when shifting it by ppm
+    shifted = non_zero_mz + (non_zero_mz * ppm * 1e-6)
+    diff_shifted = shifted - non_zero_mz
+
+    diff_mz = np.diff(non_zero_mz)  # difference between original adjacent peaks
+    n_overlap = sum(diff_shifted[:-1] > diff_mz)
+
+    return n_overlap, len(non_zero_mz)
 
 
 class ImzMLParser:
@@ -410,6 +443,120 @@ class ImzMLParser:
         return PortableSpectrumReader(self.coordinates,
                                       self.mzPrecision, self.mzOffsets, self.mzLengths,
                                       self.intensityPrecision, self.intensityOffsets, self.intensityLengths)
+
+    def check_peaks_overlap(self, n_peaks: int = 100, ppm: float = 3.0) -> float:
+        """
+        This function represents an approach for finding non-centroided datasets based on
+        comparing the distance to the neighboring peak and shifting the existing peak by N ppm.
+
+        The algorithm is described in the "Exclusion of non-centroided datasets" section of the article
+        METASPACE-ML: Metabolite annotation for imaging mass spectrometry using machine learning
+        https://www.biorxiv.org/content/10.1101/2023.05.29.542736v2
+        """
+        indexes = set([
+            random.randrange(0, len(self.coordinates))
+            for _ in range(min(len(self.coordinates), n_peaks))
+        ])
+
+        n_overlap_peaks = []
+        non_zero_peaks = []
+        for idx in indexes:
+            mzs, ints = self.getspectrum(idx)
+            n_overlap, non_zero = calc_peaks_overlap(mzs, ints, ppm)
+            n_overlap_peaks.append(n_overlap)
+            non_zero_peaks.append(non_zero)
+
+        overlap_percentage = sum(n_overlap_peaks) / sum(non_zero_peaks) * 100.0
+        return round(overlap_percentage, 2)
+
+    def get_pixel_statistics(self, idx: int) -> Dict[str, Any]:
+        """Calculate all the necessary metrics about m/z and intensity for the one spectrum"""
+        mzs, ints = self.getspectrum(idx)
+        nonzero_ints_indx = np.where(ints > 0.0)[0]
+        nonzero_ints = ints[nonzero_ints_indx]
+
+        if len(mzs) == 0:
+            return {}
+        else:
+            return {
+                'mzs_min': mzs.min(),
+                'mzs_max': mzs.max(),
+                'mzs_digitized': calc_mzs_digitize(mzs),
+                'ints_min': nonzero_ints.min() if len(nonzero_ints) > 0 else 0,  # non zero
+                'ints_50p': np.percentile(nonzero_ints, 50) if len(nonzero_ints) > 0 else 0,
+                'ints_95p': np.percentile(nonzero_ints, 95) if len(nonzero_ints) > 0 else 0,
+                'ints_max': ints.max(),
+                'ints_total': sum(ints),
+                'nonzero_intensity_peaks_count': len(nonzero_ints),
+                'total_peaks_count': len(ints),
+            }
+
+    def calc_statistics(self, n_pixels: int = 0, full: bool = False) -> Dict[str, Any]:
+        """
+        Calculate the statistics of the number of peaks for the entire dataset,
+        as well as full/n_pixels is setting up - calculate extended statistics for each pixel
+
+        :param n_pixels: the number of pixels to analyze
+        :param full: analysis of all pixels
+        """
+        peaks_statistics = {
+            'ds_peaks_stats': {
+                'min': min(self.intensityLengths),
+                'median': int(np.median(self.intensityLengths)),
+                '95p': int(np.percentile(self.intensityLengths, q=95)),
+                'max': max(self.intensityLengths),
+            }
+        }
+
+        # select all coordinates or a subset depending on the value of the full/n_pixels variables
+        if full:
+            indexes = list(range(len(self.coordinates)))
+        elif n_pixels:
+            indexes = set([
+                random.randrange(0, len(self.coordinates))
+                for _ in range(min(len(self.coordinates), n_pixels))
+            ])
+        else:
+            indexes = []
+
+        if indexes:
+            mzs_min, mzs_max = [], []
+            ints_min, ints_max, ints_total = [], [], []
+            ints_50p, ints_95p = [], []
+            nonzero_intensity_peaks_count, total_peaks_count = [], []
+            mzs_digitized = Counter()
+            for idx in indexes:
+                pixel_stats = self.get_pixel_statistics(idx)
+                if not pixel_stats:
+                    continue
+                mzs_min.append(pixel_stats['mzs_min'])
+                mzs_max.append(pixel_stats['mzs_max'])
+                mzs_digitized += pixel_stats['mzs_digitized']
+                ints_min.append(pixel_stats['ints_min'])
+                ints_50p.append(pixel_stats['ints_50p'])
+                ints_95p.append(pixel_stats['ints_95p'])
+                ints_max.append(pixel_stats['ints_max'])
+                ints_total.append(pixel_stats['ints_total'])
+                nonzero_intensity_peaks_count.append(pixel_stats['nonzero_intensity_peaks_count'])
+                total_peaks_count.append(pixel_stats['total_peaks_count'])
+
+            peaks_statistics.update({
+                'mz_min': min(mzs_min),
+                'mz_max': max(mzs_max),
+                'mzs_min': np.array(mzs_min, dtype=np.float32),
+                'mzs_max': np.array(mzs_max, dtype=np.float32),
+                'mzs_digitized': mzs_digitized,
+                'ints_min': np.array(ints_min, dtype=np.float32),
+                'ints_50p': np.array(ints_50p, dtype=np.float32),
+                'ints_95p': np.array(ints_95p, dtype=np.float32),
+                'ints_max': np.array(ints_max, dtype=np.float32),
+                'ints_total': np.array(ints_total, dtype=np.float32),
+                'nonzero_intensity_lengths': np.array(nonzero_intensity_peaks_count, dtype=np.int32),
+                'nonzero_peaks_percentage':
+                    round(sum(nonzero_intensity_peaks_count)/sum(total_peaks_count) * 100.0, 2),
+            })
+
+        return peaks_statistics
 
 
 def getionimage(p, mz_value, tol=0.1, z=1, reduce_func=sum):
