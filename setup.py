@@ -6,11 +6,10 @@ setup(
     version=__version__,
     description="Parser for conversion of imzML 1.1.0 files",
     long_description="""
-Parser for conversion of imzML 1.1.0 files.
-See specification here: https://ms-imaging.org/wp-content/uploads/2009/08/specifications_imzML1.1.0_RC1.pdf.
-Outputs data as python lists and dicts.
-
-Python 3.3 or newer is recommended for performance reasons.""",
+Parser for conversion of imzML 1.1.0 files. 
+See specification here: https://ms-imaging.org/wp-content/uploads/2009/08/specifications_imzML1.1.0_RC1.pdf. 
+Outputs data as python lists, dicts or numpy array.
+""",
     # The project's main homepage.
     url='https://github.com/alexandrovteam/pyimzML',
     author='Alexandrov Team, EMBL',
@@ -26,11 +25,6 @@ Python 3.3 or newer is recommended for performance reasons.""",
         'License :: OSI Approved :: Apache Software License',
 
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
     keywords='bioinformatics imaging mass spectrometry parser imzML',
