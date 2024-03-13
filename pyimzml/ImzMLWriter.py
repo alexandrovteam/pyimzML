@@ -69,7 +69,7 @@ IMZML_TEMPLATE = """\
   </referenceableParamGroupList>
 
   <softwareList count="1">
-    <software id="pyimzml" version="0.0001">
+    <software id="pyimzml" version="1.5.4">
       <cvParam cvRef="MS" accession="MS:1000799" name="custom unreleased software tool" value="pyimzml exporter"/>
     </software>
   </softwareList>
