@@ -117,6 +117,7 @@ class ImzMLParser:
         self.root = None
         self.metadata = None
         self.polarity = None
+        self.spectrum_mode = None
         if include_spectra_metadata == 'full':
             self.spectrum_full_metadata = []
         elif include_spectra_metadata is not None:
@@ -184,6 +185,7 @@ class ImzMLParser:
                 self.__process_spectrum(elem, include_spectra_metadata)
                 if is_first_spectrum:
                     self.__read_polarity(elem)
+                    self.__read_spectrum_mode(elem)
                     is_first_spectrum = False
                 slist.remove(elem)
         self.__fix_offsets()
@@ -277,6 +279,31 @@ class ImzMLParser:
             self.polarity = 'positive'
         elif has_negative:
             self.polarity = 'negative'
+
+    def __read_spectrum_mode(self, elem):
+        """
+        This method checks for centroid (MS:1000127) / profile (MS:1000128) mode information.
+
+        It's too slow to always check all spectra, so first check the referenceable_param_groups
+        in the header to see if they indicate the spectrum mode.
+        If not, try to detect it from the first spectrum's full metadata.
+        """
+        param_groups = self.metadata.referenceable_param_groups.values()
+        spectrum_metadata = SpectrumData(elem, self.metadata.referenceable_param_groups)
+
+        profile_mode = (
+            any('profile spectrum' in group for group in param_groups)
+            or 'profile spectrum' in spectrum_metadata
+        )
+        centroid_mode = (
+            any('centroid spectrum' in group for group in param_groups)
+            or 'centroid spectrum' in spectrum_metadata
+        )
+
+        if profile_mode:
+            self.spectrum_mode = 'profile'
+        elif centroid_mode:
+            self.spectrum_mode = 'centroid'
 
     def __readimzmlmeta(self):
         """
