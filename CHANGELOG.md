@@ -1,3 +1,9 @@
+## 1.5.4 (2024-03-13)
+* Add `ImzMLParser.spectrum_mode` field.
+* Fix a bug in parsing `userParam` value.
+* Replaced broken links in README file
+* Updated GitHub Actions workflow
+
 ## 1.5.3 (2022-11-09)
 * Fixing a bug in the documentation.
 
