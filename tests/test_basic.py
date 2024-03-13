@@ -7,7 +7,7 @@ from .context import getspectrum
 import pyimzml.ImzMLParser as imzmlp
 import pyimzml.ImzMLWriter as imzmlw
 
-# Example files from https://ms-imaging.org/wp/imzml/example-files-test/
+# Example files from https://www.ms-imaging.org/imzml/example-files-test/
 CONTINUOUS_IMZML_PATH = str(Path(__file__).parent / 'data/Example_Continuous.imzML')
 CONTINUOUS_IBD_PATH = str(Path(__file__).parent / 'data/Example_Continuous.ibd')
 PROCESSED_IMZML_PATH = str(Path(__file__).parent / 'data/Example_Processed.imzML')
@@ -42,6 +42,7 @@ class ImzMLParser(unittest.TestCase):
                 mzs, ints = parser.getspectrum(4)
 
                 assert parser.polarity == 'negative'
+                assert parser.spectrum_mode == 'profile'
                 assert len(parser.coordinates) == 9
                 assert mzs.dtype == np.float32
                 assert ints.dtype == np.float32
@@ -51,7 +52,6 @@ class ImzMLParser(unittest.TestCase):
                 assert np.all(mzs < 800.0)
                 assert np.all(ints >= 0.0)
                 assert np.all(ints < 3.0)
-
 
     def test_files_instead_of_paths(self):
         for parse_lib, data_name, imzml_path, ibd_path in ALL_TEST_CASES:
@@ -142,7 +142,6 @@ class ImzMLParser(unittest.TestCase):
                 assert all(invalid is None for invalid in parser.spectrum_metadata_fields[INVALID])
 
 
-
 class PortableSpectrumReader(unittest.TestCase):
     def test_read_file(self):
         spectrum_idx = 4
@@ -170,6 +169,7 @@ class ImzMLWriter(unittest.TestCase):
         coords = [1,1,1]
         with imzmlw.ImzMLWriter("test.mzML", mode="processed") as imzml:
             imzml.addSpectrum(mzs, ints, coords=coords)
+
 
 if __name__ == '__main__':
     unittest.main()
