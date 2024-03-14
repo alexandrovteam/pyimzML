@@ -512,6 +512,7 @@ class ImzMLParser:
                 'ints_min': nonzero_ints.min() if len(nonzero_ints) > 0 else 0,  # non zero
                 'ints_50p': np.percentile(nonzero_ints, 50) if len(nonzero_ints) > 0 else 0,
                 'ints_95p': np.percentile(nonzero_ints, 95) if len(nonzero_ints) > 0 else 0,
+                'ints_99p': np.percentile(nonzero_ints, 99) if len(nonzero_ints) > 0 else 0,
                 'ints_max': ints.max(),
                 'ints_total': sum(ints),
                 'nonzero_intensity_peaks_count': len(nonzero_ints),
@@ -549,7 +550,7 @@ class ImzMLParser:
         if indexes:
             mzs_min, mzs_max = [], []
             ints_min, ints_max, ints_total = [], [], []
-            ints_50p, ints_95p = [], []
+            ints_50p, ints_95p, ints_99p = [], [], []
             nonzero_intensity_peaks_count, total_peaks_count = [], []
             mzs_digitized = Counter()
             for idx in indexes:
@@ -562,6 +563,7 @@ class ImzMLParser:
                 ints_min.append(spectrum_stats['ints_min'])
                 ints_50p.append(spectrum_stats['ints_50p'])
                 ints_95p.append(spectrum_stats['ints_95p'])
+                ints_99p.append(spectrum_stats['ints_99p'])
                 ints_max.append(spectrum_stats['ints_max'])
                 ints_total.append(spectrum_stats['ints_total'])
                 nonzero_intensity_peaks_count.append(spectrum_stats['nonzero_intensity_peaks_count'])
@@ -576,6 +578,7 @@ class ImzMLParser:
                 'ints_min': np.array(ints_min, dtype=np.float32),
                 'ints_50p': np.array(ints_50p, dtype=np.float32),
                 'ints_95p': np.array(ints_95p, dtype=np.float32),
+                'ints_99p': np.array(ints_99p, dtype=np.float32),
                 'ints_max': np.array(ints_max, dtype=np.float32),
                 'ints_total': np.array(ints_total, dtype=np.float32),
                 'nonzero_intensity_lengths': np.array(nonzero_intensity_peaks_count, dtype=np.int32),
