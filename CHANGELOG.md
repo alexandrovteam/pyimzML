@@ -1,3 +1,6 @@
+## 1.5.5 (2024-11-04)
+* Add dataset descriptive statistics
+
 ## 1.5.4 (2024-03-13)
 * Add `ImzMLParser.spectrum_mode` field.
 * Fix a bug in parsing `userParam` value.
