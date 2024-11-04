@@ -480,6 +480,7 @@ class ImzMLParser:
         METASPACE-ML: Metabolite annotation for imaging mass spectrometry using machine learning
         https://www.biorxiv.org/content/10.1101/2023.05.29.542736v2
         """
+        random.seed(42)
         indexes = set([
             random.randrange(0, len(self.coordinates))
             for _ in range(min(len(self.coordinates), n_spectrum))
@@ -503,6 +504,11 @@ class ImzMLParser:
         nonzero_ints = ints[nonzero_ints_indx]
 
         if len(mzs) == 0:
+            return {}
+        # some datasets have anomalous values of m/z, like 1.0e+35
+        elif mzs.max() > 1_000_000:
+            return {}
+        elif np.all(np.isnan(mzs)):
             return {}
         else:
             return {
@@ -540,6 +546,7 @@ class ImzMLParser:
         if full:
             indexes = list(range(len(self.coordinates)))
         elif n_spectrum:
+            random.seed(42)
             indexes = set([
                 random.randrange(0, len(self.coordinates))
                 for _ in range(min(len(self.coordinates), n_spectrum))
